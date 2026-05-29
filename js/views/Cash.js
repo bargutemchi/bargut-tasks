@@ -1,4 +1,5 @@
 /* global Vue, APP_STATE, getUser, canManage, nextId, todayStr */
+(function () {
 const { defineComponent, ref, computed } = Vue;
 
 const SERVICES = [
@@ -153,3 +154,4 @@ window.CashView = defineComponent({
     </div>
   `,
 });
+})();
