@@ -1,4 +1,5 @@
 /* global Vue, APP_STATE, getUser, canManage, nextId */
+(function () {
 const { defineComponent, ref, computed } = Vue;
 
 const DEPT_TABS = [
@@ -211,3 +212,4 @@ window.DepartmentsView = defineComponent({
     </div>
   `,
 });
+})();
