@@ -1,4 +1,5 @@
 /* global Vue, VueRouter, APP_STATE, APP_USERS, canManage */
+(function () {
 const { createApp, defineComponent, ref, computed } = Vue;
 const { createRouter, createWebHashHistory } = VueRouter;
 
@@ -132,3 +133,4 @@ const App = defineComponent({
 const app = createApp(App);
 app.use(router);
 app.mount('#app');
+})();
