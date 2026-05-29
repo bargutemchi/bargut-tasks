@@ -1,4 +1,5 @@
 /* global Vue, APP_STATE, APP_USERS, getUser, nextId, formatTime */
+(function () {
 const { defineComponent, ref, computed, reactive, nextTick, onMounted } = Vue;
 
 // ── Утилиты медиафайлов ──────────────────────────────────────
@@ -380,3 +381,4 @@ window.ChatView = defineComponent({
     </div>
   `,
 });
+})();
