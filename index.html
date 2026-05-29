@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#08205e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Задачи — Баргут Эмчи</title>
+  <!-- Google Fonts убраны — могут блокироваться в России -->
+
+  <!-- Supabase SDK (локальный файл — никаких CDN) -->
+  <script src="js/vendor/supabase.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --navy:      #08205e;
+      --navy-mid:  #0d2d7a;
+      --navy-lt:   #1a3d8a;
+      --gold:      #b8972e;
+      --gold-lt:   #fdf8ec;
+      --bg:        #eef2f8;
+      --card:      #ffffff;
+      --text:      #1a2a4a;
+      --muted:     #6a7a9a;
+      --border:    #d8e2f0;
+      --high-bg:   #fee2e2; --high-fg: #c53030;
+      --med-bg:    #fef9c3; --med-fg:  #b45309;
+      --low-bg:    #dcfce7; --low-fg:  #166534;
+      --done-bg:   #f0fdf4;
+      --red:       #e53e3e;
+    }
+
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    .hidden { display: none !important; }
+    a { color: var(--gold); }
+
+    /* ══ SETUP SCREEN ══ */
+    #setup-screen {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 40px 16px 40px;
+      background: linear-gradient(160deg, var(--navy) 0%, var(--navy-lt) 100%);
+    }
+    .setup-emblem { font-size: 44px; margin-bottom: 10px; }
+    .setup-title  { font-size: 26px; font-weight: 700; color: #fff; letter-spacing:.06em; text-align:center; }
+    .setup-sub    { font-size: 12px; color: rgba(255,255,255,.5); letter-spacing:.15em; text-transform:uppercase; margin: 4px 0 24px; }
+    .setup-card {
+      background: rgba(255,255,255,.95);
+      border-radius: 20px;
+      padding: 24px;
+      width: 100%;
+      max-width: 480px;
+    }
+    .setup-card h2 { font-size: 16px; font-weight: 700; color: var(--navy); margin-bottom: 10px; }
+    .setup-card p  { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 18px; }
+    .setup-steps   { margin-bottom: 18px; }
+    .setup-step {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+    .step-num {
+      background: var(--navy);
+      color: #fff;
+      border-radius: 50%;
+      width: 22px; height: 22px;
+      flex-shrink: 0;
+      display: flex; align-items:center; justify-content:center;
+      font-size: 11px; font-weight: 700;
+    }
+    .setup-card code {
+      background: var(--bg);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+    .config-textarea {
+      width: 100%;
+      height: 110px;
+      font-family: monospace;
+      font-size: 11px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      resize: vertical;
+      margin-bottom: 12px;
+      outline: none;
+      color: var(--text);
+    }
+    .config-textarea:focus { border-color: var(--navy); }
+    .btn-setup {
+      width: 100%;
+      padding: 13px;
+      background: var(--navy);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-setup:hover { background: var(--navy-mid); }
+
+    /* ══ LOADING ══ */
+    #loading-screen {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background: linear-gradient(160deg, var(--navy) 0%, var(--navy-lt) 100%);
+    }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid rgba(255,255,255,.2);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-label { font-size: 14px; color: rgba(255,255,255,.6); font-weight: 500; }
+
+    /* ══ LOGIN ══ */
+    #login-screen {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px 32px;
+      background: linear-gradient(160deg, var(--navy) 0%, var(--navy-lt) 100%);
+    }
+    .login-emblem    { font-size: 40px; margin-bottom: 10px; }
+    .login-brand     { font-size: 26px; font-weight: 700; color: #fff; letter-spacing:.06em; }
+    .login-brand-sub { font-size: 11px; color: rgba(255,255,255,.5); letter-spacing:.15em; text-transform:uppercase; margin: 4px 0 6px; }
+    .login-divider   { width: 40px; height: 2px; background: var(--gold); border-radius: 2px; margin: 0 auto 24px; }
+    .login-prompt    { font-size: 15px; font-weight: 500; color: rgba(255,255,255,.75); margin-bottom: 18px; }
+    .user-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      width: 100%;
+      max-width: 400px;
+    }
+    .user-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 7px;
+      padding: 14px 8px 12px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 16px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background .2s, transform .12s;
+    }
+    .user-btn:hover  { background: rgba(255,255,255,.16); }
+    .user-btn:active { transform: scale(.95); }
+    .user-btn .av    { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; color:#fff; border:2px solid rgba(255,255,255,.25); }
+    .user-btn .uname { font-size:13px; font-weight:600; color:#fff; }
+    .user-btn .urole { font-size:9.5px; color:rgba(255,255,255,.5); text-align:center; line-height:1.3; }
+    .login-footer    { margin-top: 28px; font-size: 11px; color: rgba(255,255,255,.3); }
+
+    /* ══ APP SHELL ══ */
+    #app-screen { display: flex; flex-direction: column; min-height: 100dvh; }
+
+    .app-header {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--navy);
+      padding: 11px 16px;
+      display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 2px 10px rgba(8,32,94,.35);
+    }
+    .hdr-logo { font-size:16px; font-weight:700; color:#fff; letter-spacing:.03em; line-height:1.2; }
+    .hdr-logo small { display:block; font-size:10px; font-weight:400; color:rgba(255,255,255,.45); letter-spacing:.08em; text-transform:uppercase; }
+    .hdr-spacer { flex: 1; }
+    .hdr-right  { display: flex; align-items: center; gap: 8px; }
+    .online-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #48bb78;
+      box-shadow: 0 0 0 2px rgba(72,187,120,.3);
+      flex-shrink: 0;
+    }
+    .online-dot.offline { background: #fc8181; box-shadow: 0 0 0 2px rgba(252,129,129,.3); }
+    .hdr-av {
+      width:32px; height:32px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      font-weight:700; font-size:12px; color:#fff;
+      border:2px solid rgba(255,255,255,.2); flex-shrink:0;
+    }
+    .hdr-name { font-size:13px; font-weight:600; color:rgba(255,255,255,.9); white-space:nowrap; }
+    .btn-new {
+      background: var(--gold);
+      border: none; color: #fff;
+      font-family: inherit; font-size: 12px; font-weight: 700;
+      padding: 6px 12px; border-radius: 8px;
+      cursor: pointer; white-space: nowrap;
+      transition: background .2s;
+    }
+    .btn-new:hover { background: #9a7d25; }
+    .btn-logout {
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.15);
+      color: rgba(255,255,255,.65);
+      font-family: inherit; font-size: 11px; font-weight: 500;
+      padding: 5px 10px; border-radius: 8px; cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,.18); }
+
+    /* ══ CONTENT ══ */
+    .app-content { flex:1; padding: 18px 16px 40px; max-width: 600px; margin: 0 auto; width: 100%; }
+    .greeting      { font-size: 21px; font-weight: 700; color: var(--navy); margin-bottom: 2px; }
+    .greeting-date { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+
+    /* Stats */
+    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+    .stat-card  { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 8px 9px; text-align: center; }
+    .stat-value { font-size: 22px; font-weight: 700; line-height: 1; }
+    .stat-label { font-size: 10px; color: var(--muted); margin-top: 3px; text-transform: uppercase; letter-spacing:.04em; }
+
+    /* Progress */
+    .progress-wrap { background: var(--border); border-radius: 6px; height: 7px; margin-bottom: 18px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--navy), var(--gold)); border-radius: 6px; transition: width .5s cubic-bezier(.4,0,.2,1); }
+
+    /* Filter tabs */
+    .filter-bar {
+      display: flex; gap: 0;
+      background: var(--card); border-radius: 12px; padding: 4px;
+      border: 1px solid var(--border); margin-bottom: 16px;
+    }
+    .ftab {
+      flex: 1; padding: 8px 2px; border: none; border-radius: 9px;
+      cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600;
+      color: var(--muted); background: transparent;
+      transition: background .2s, color .2s; text-align: center;
+    }
+    .ftab.active { background: var(--navy); color: #fff; }
+    .ftab .cnt {
+      display: inline-block; background: rgba(255,255,255,.25); color: inherit;
+      border-radius: 10px; font-size: 10px; font-weight: 700;
+      padding: 0 5px; line-height: 16px; margin-left: 3px;
+    }
+    .ftab:not(.active) .cnt { background: var(--bg); color: var(--muted); }
+
+    /* Section label */
+    .section-label { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin: 14px 0 7px; }
+
+    /* Task card */
+    .task-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+      padding: 13px 14px; margin-bottom: 9px;
+      display: flex; align-items: flex-start; gap: 12px;
+      cursor: pointer; transition: box-shadow .2s, transform .12s;
+      user-select: none;
+    }
+    .task-card:hover  { box-shadow: 0 3px 14px rgba(8,32,94,.09); }
+    .task-card:active { transform: scale(.99); }
+    .task-card.is-done    { background: var(--done-bg); border-color: #c6f0d4; opacity: .72; }
+    .task-card.is-overdue { border-left: 3px solid var(--red); }
+
+    /* Checkbox */
+    .chk {
+      width:24px; height:24px; border-radius:50%;
+      border: 2px solid var(--border); flex-shrink:0; margin-top:1px;
+      display:flex; align-items:center; justify-content:center;
+      background:#fff; transition: all .2s; font-size:13px;
+      color: transparent; font-weight:700;
+    }
+    .task-card:hover .chk { border-color: var(--gold); }
+    .chk.chk-done { background: var(--gold); border-color: var(--gold); color: #fff; }
+
+    /* Task body */
+    .task-body  { flex:1; min-width:0; }
+    .task-title { font-size:14px; font-weight:600; color:var(--text); margin-bottom:5px; line-height:1.4; word-break:break-word; }
+    .is-done .task-title { text-decoration:line-through; color:var(--muted); }
+    .task-desc  { font-size:12px; color:var(--muted); line-height:1.5; margin-bottom:6px; }
+    .task-meta  { display:flex; flex-wrap:wrap; gap:5px; align-items:center; }
+    .pbadge     { font-size:10px; font-weight:700; padding:2px 7px; border-radius:6px; text-transform:uppercase; letter-spacing:.04em; }
+    .p-high   { background:var(--high-bg); color:var(--high-fg); }
+    .p-medium { background:var(--med-bg);  color:var(--med-fg); }
+    .p-low    { background:var(--low-bg);  color:var(--low-fg); }
+    .meta-chip { font-size:11px; color:var(--muted); display:flex; align-items:center; gap:2px; }
+    .meta-chip.overdue { color:var(--high-fg); font-weight:700; }
+
+    /* Assignee avatar in task */
+    .task-av {
+      width:22px; height:22px; border-radius:50%;
+      display:inline-flex; align-items:center; justify-content:center;
+      font-size:9px; font-weight:700; color:#fff; flex-shrink:0;
+    }
+
+    /* Empty state */
+    .empty { text-align:center; padding:56px 24px; color:var(--muted); }
+    .empty-icon { font-size:52px; margin-bottom:12px; display:block; }
+    .empty-text { font-size:17px; font-weight:600; color:var(--navy); margin-bottom:6px; }
+    .empty-sub  { font-size:13px; }
+
+    /* ══ CREATE TASK MODAL ══ */
+    .modal-bg {
+      position: fixed; inset: 0; background: rgba(8,32,94,.55);
+      z-index: 200; display: flex; align-items: flex-end;
+      animation: fadeIn .2s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } }
+    .modal-sheet {
+      background: #fff; border-radius: 24px 24px 0 0;
+      width: 100%; max-width: 600px; margin: 0 auto;
+      padding: 0 0 env(safe-area-inset-bottom, 16px);
+      max-height: 92dvh; overflow-y: auto;
+      animation: slideUp .28s cubic-bezier(.4,0,.2,1);
+    }
+    @keyframes slideUp { from { transform: translateY(100%); } }
+    .modal-hdr {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 20px 0; position: sticky; top: 0;
+      background: #fff; border-radius: 24px 24px 0 0;
+    }
+    .modal-hdr h2    { font-size: 18px; font-weight: 700; color: var(--navy); }
+    .modal-close     { background:none; border:none; font-size:20px; color:var(--muted); cursor:pointer; padding:4px; }
+    .modal-body      { padding: 16px 20px 24px; }
+    .form-group      { margin-bottom: 14px; }
+    .form-label      { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing:.06em; color:var(--muted); display:block; margin-bottom:6px; }
+    .form-control {
+      width: 100%; padding: 11px 14px;
+      border: 1px solid var(--border); border-radius: 10px;
+      font-family: inherit; font-size: 14px; color: var(--text);
+      outline: none; transition: border-color .2s; background: #fff;
+    }
+    .form-control:focus { border-color: var(--navy); }
+    textarea.form-control { resize: vertical; min-height: 72px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .btn-submit {
+      width: 100%; padding: 14px;
+      background: var(--navy); color: #fff; border: none;
+      border-radius: 12px; font-family: inherit;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      margin-top: 4px; transition: background .2s;
+    }
+    .btn-submit:hover { background: var(--navy-mid); }
+    .btn-submit:disabled { opacity: .6; cursor: default; }
+
+    /* ══ TOAST ══ */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--navy); color: #fff;
+      font-size: 13px; font-weight: 600;
+      padding: 10px 20px; border-radius: 24px;
+      box-shadow: 0 4px 20px rgba(8,32,94,.35);
+      transition: transform .3s cubic-bezier(.4,0,.2,1), opacity .3s;
+      opacity: 0; z-index: 999; white-space: nowrap; pointer-events: none;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  </style>
+</head>
+<body>
+
+
+<!-- ══════ LOADING ══════ -->
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <div class="loading-label">Загрузка данных…</div>
+</div>
+
+<!-- ══════ LOGIN ══════ -->
+<div id="login-screen" class="hidden">
+  <div class="login-emblem">🏥</div>
+  <div class="login-brand">БАРГУТ ЭМЧИ</div>
+  <div class="login-brand-sub">Задачи команды</div>
+  <div class="login-divider"></div>
+  <div class="login-prompt">Выберите своё имя</div>
+  <div class="user-grid" id="user-grid"></div>
+  <div class="login-footer">Улан-Удэ · ул. Боевая 9а</div>
+</div>
+
+<!-- ══════ APP ══════ -->
+<div id="app-screen" class="hidden">
+  <header class="app-header">
+    <div class="hdr-logo">Баргут Эмчи<small>Задачи команды</small></div>
+    <div class="hdr-spacer"></div>
+    <div class="hdr-right">
+      <div class="online-dot" id="online-dot" title="Онлайн"></div>
+      <div class="hdr-av" id="hdr-av"></div>
+      <span class="hdr-name" id="hdr-name"></span>
+      <button class="btn-new" onclick="openModal()">+ Задача</button>
+      <button class="btn-logout" onclick="logout()">Выйти</button>
+    </div>
+  </header>
+
+  <div class="app-content">
+    <div class="greeting" id="greeting"></div>
+    <div class="greeting-date" id="gdate"></div>
+
+    <div class="stats-row" id="stats-row"></div>
+
+    <div class="progress-wrap">
+      <div class="progress-fill" id="pfill" style="width:0%"></div>
+    </div>
+
+    <div class="filter-bar">
+      <button class="ftab active" data-f="mine"    onclick="setFilter('mine')">   Мои <span class="cnt" id="c-mine"></span></button>
+      <button class="ftab"        data-f="by-me"   onclick="setFilter('by-me')">  Я дал <span class="cnt" id="c-byme"></span></button>
+      <button class="ftab"        data-f="all"     onclick="setFilter('all')">    Все <span class="cnt" id="c-all"></span></button>
+      <button class="ftab"        data-f="done"    onclick="setFilter('done')">   Готово <span class="cnt" id="c-done"></span></button>
+    </div>
+
+    <div id="tasks-list"></div>
+  </div>
+</div>
+
+<!-- ══════ CREATE MODAL ══════ -->
+<div id="create-modal" class="hidden">
+  <div class="modal-bg" onclick="handleModalBgClick(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="modal-hdr">
+        <h2>Новая задача</h2>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Название *</label>
+          <input id="f-title" class="form-control" placeholder="Что нужно сделать?" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Описание</label>
+          <textarea id="f-desc" class="form-control" placeholder="Подробности…"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Кому назначить</label>
+          <select id="f-assignee" class="form-control"></select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Приоритет</label>
+            <select id="f-priority" class="form-control">
+              <option value="high">🔴 Высокий</option>
+              <option value="medium" selected>🟡 Средний</option>
+              <option value="low">🟢 Низкий</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Срок</label>
+            <input type="date" id="f-deadline" class="form-control">
+          </div>
+        </div>
+        <button class="btn-submit" id="btn-submit" onclick="submitTask()">Создать задачу</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── Справочник сотрудников ─────────────────────────────────
+const USERS = [
+  { id:1,  name:'Руслан',    short:'Р',  roleLabel:'Владелец',          color:'#08205e' },
+  { id:2,  name:'Ирина',     short:'И',  roleLabel:'Зам. директора',    color:'#0d2d7a' },
+  { id:3,  name:'Жанна',     short:'Ж',  roleLabel:'Гл. администратор', color:'#1a3d8a' },
+  { id:4,  name:'Амгалан',   short:'Ам', roleLabel:'Врач-пульсолог',    color:'#1a5a6a' },
+  { id:5,  name:'Цыпелма',   short:'Цы', roleLabel:'Иглоукалывание',    color:'#2a6a5a' },
+  { id:6,  name:'Аладр',     short:'Ал', roleLabel:'Массажист',         color:'#4a5a8a' },
+  { id:7,  name:'Аюна',      short:'Ая', roleLabel:'Массажист',         color:'#5a4a8a' },
+  { id:8,  name:'Анна',      short:'Ан', roleLabel:'Реклама / SMM',     color:'#6a3a7a' },
+  { id:9,  name:'Татьяна',   short:'Та', roleLabel:'Отдел продаж',      color:'#7a4a3a' },
+  { id:10, name:'Валентина', short:'Ва', roleLabel:'Администратор',     color:'#3a5a6a' },
+];
+
+// ── Supabase ─────────────────────────────────────────────────
+const SUPABASE_URL = 'https://borcyrnppmezvuddoywn.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_u5X6o4giDH54gh7wskgUyg_ir8aQS4t';
+let sb;
+try {
+  sb = (window.supabase || window.supabaseJs).createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch(e) {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('loading-screen').innerHTML =
+      '<div style="color:white;padding:32px;text-align:center;font-family:sans-serif">' +
+      '<p style="font-size:18px;margin-bottom:12px">⚠ Ошибка загрузки</p>' +
+      '<p style="font-size:13px;opacity:.7">Обновите страницу или проверьте интернет</p></div>';
+  });
+}
+
+// ── State ───────────────────────────────────────────────────
+let currentUser = null;
+let tasks       = [];
+let filter      = 'mine';
+let toastTimer  = null;
+
+// ── Helpers ─────────────────────────────────────────────────
+const _fmt  = d => d.toISOString().split('T')[0];
+const today = () => _fmt(new Date());
+function getUser(id)     { return USERS.find(u => u.id === id) || null; }
+function isOverdue(task) { return task.status !== 'done' && task.deadline < today(); }
+
+function fmtDate(s) {
+  if (!s) return '';
+  const d    = new Date(s + 'T00:00:00');
+  const now  = new Date(); now.setHours(0,0,0,0);
+  const diff = Math.round((d - now) / 86400000);
+  if (diff === 0)  return 'Сегодня';
+  if (diff === 1)  return 'Завтра';
+  if (diff === -1) return 'Вчера';
+  if (diff < -1)   return `${Math.abs(diff)} дн. назад`;
+  return d.toLocaleDateString('ru-RU', { day:'numeric', month:'short' });
+}
+
+function greet() {
+  const h = new Date().getHours();
+  if (h < 5)  return 'Доброй ночи';
+  if (h < 12) return 'Доброе утро';
+  if (h < 17) return 'Добрый день';
+  return 'Добрый вечер';
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+function show(id)  { document.getElementById(id).classList.remove('hidden'); }
+function hide(id)  { document.getElementById(id).classList.add('hidden'); }
+
+// ── Fetch tasks from Supabase ────────────────────────────────
+async function fetchTasks() {
+  try {
+    const { data, error } = await sb.from('tasks').select('*').order('created_at', { ascending: false });
+    if (error) {
+      document.getElementById('online-dot').classList.add('offline');
+      hide('loading-screen');
+      if (currentUser) renderApp(); else renderLogin();
+      return;
+    }
+    document.getElementById('online-dot').classList.remove('offline');
+    tasks = data.map(t => ({
+      id:          t.id,
+      title:       t.title,
+      desc:        t.description,
+      assigneeId:  t.assignee_id,
+      createdById: t.created_by_id,
+      priority:    t.priority,
+      status:      t.status,
+      deadline:    t.deadline,
+    }));
+    hide('loading-screen');
+    if (currentUser) renderApp(); else renderLogin();
+  } catch (e) {
+    document.getElementById('online-dot').classList.add('offline');
+    hide('loading-screen');
+    if (currentUser) renderApp(); else renderLogin();
+  }
+}
+
+// ── Login ────────────────────────────────────────────────────
+function renderLogin() {
+  hide('app-screen');
+  const grid = document.getElementById('user-grid');
+  grid.innerHTML = USERS.map(u => `
+    <button class="user-btn" onclick="selectUser(${u.id})">
+      <div class="av" style="background:${u.color}">${esc(u.short)}</div>
+      <div class="uname">${esc(u.name)}</div>
+      <div class="urole">${esc(u.roleLabel)}</div>
+    </button>
+  `).join('');
+  show('login-screen');
+}
+
+function selectUser(uid) {
+  currentUser = USERS.find(u => u.id === uid);
+  if (!currentUser) return;
+  localStorage.setItem('be_worker_id', uid);
+  hide('login-screen');
+  showApp();
+}
+
+function logout() {
+  currentUser = null;
+  localStorage.removeItem('be_worker_id');
+  filter = 'mine';
+  hide('app-screen');
+  renderLogin();
+}
+
+// ── App ──────────────────────────────────────────────────────
+function showApp() {
+  const av = document.getElementById('hdr-av');
+  av.textContent        = currentUser.short;
+  av.style.background   = currentUser.color;
+  document.getElementById('hdr-name').textContent = currentUser.name;
+
+  // Reset filter to mine
+  filter = 'mine';
+  document.querySelectorAll('.ftab').forEach(t =>
+    t.classList.toggle('active', t.dataset.f === 'mine')
+  );
+
+  show('app-screen');
+  renderApp();
+}
+
+function setFilter(f) {
+  filter = f;
+  document.querySelectorAll('.ftab').forEach(t =>
+    t.classList.toggle('active', t.dataset.f === f)
+  );
+  renderTasks();
+}
+
+function renderApp() {
+  if (!currentUser) return;
+
+  const mine  = tasks.filter(t => t.assigneeId === currentUser.id);
+  const done  = mine.filter(t => t.status === 'done').length;
+  const total = mine.length;
+  const pct   = total > 0 ? Math.round(done / total * 100) : 0;
+
+  document.getElementById('greeting').textContent =
+    `${greet()}, ${currentUser.name}!`;
+  document.getElementById('gdate').textContent =
+    new Date().toLocaleDateString('ru-RU', { weekday:'long', day:'numeric', month:'long' });
+
+  // Stats
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--red)">${total - done}</div>
+      <div class="stat-label">Активных</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color:#166534">${done}</div>
+      <div class="stat-label">Выполнено</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color:var(--gold)">${pct}%</div>
+      <div class="stat-label">Прогресс</div>
+    </div>`;
+
+  document.getElementById('pfill').style.width = pct + '%';
+
+  // Tab counters
+  const byMe = tasks.filter(t => t.createdById === currentUser.id && t.assigneeId !== currentUser.id);
+  document.getElementById('c-mine').textContent = mine.filter(t => t.status !== 'done').length;
+  document.getElementById('c-byme').textContent = byMe.filter(t => t.status !== 'done').length;
+  document.getElementById('c-all').textContent  = tasks.length;
+  document.getElementById('c-done').textContent = done;
+
+  renderTasks();
+}
+
+function renderTasks() {
+  if (!currentUser) return;
+
+  let list;
+  if      (filter === 'mine')  list = tasks.filter(t => t.assigneeId === currentUser.id && t.status !== 'done');
+  else if (filter === 'by-me') list = tasks.filter(t => t.createdById === currentUser.id && t.assigneeId !== currentUser.id);
+  else if (filter === 'done')  list = tasks.filter(t => t.assigneeId === currentUser.id && t.status === 'done');
+  else                         list = [...tasks];
+
+  // Sort: overdue first, then priority, then deadline
+  const pOrd = { high:0, medium:1, low:2 };
+  list.sort((a, b) => {
+    if (filter !== 'done') {
+      const ao = isOverdue(a) ? 0 : 1, bo = isOverdue(b) ? 0 : 1;
+      if (ao !== bo) return ao - bo;
+    }
+    const pd = (pOrd[a.priority] ?? 1) - (pOrd[b.priority] ?? 1);
+    if (pd !== 0) return pd;
+    return (a.deadline || '').localeCompare(b.deadline || '');
+  });
+
+  const container = document.getElementById('tasks-list');
+
+  if (list.length === 0) {
+    const msgs = {
+      mine:  ['🎉', 'Нет активных задач', 'Отличная работа!'],
+      'by-me':['📋', 'Вы ничего не назначали', 'Нажмите «+ Задача» чтобы поставить задачу'],
+      all:   ['📋', 'Задач пока нет', 'Нажмите «+ Задача» чтобы создать первую'],
+      done:  ['✅', 'Нет выполненных задач', 'Выполненные задачи появятся здесь'],
+    };
+    const [ico, ttl, sub] = msgs[filter] || msgs.all;
+    container.innerHTML = `
+      <div class="empty">
+        <span class="empty-icon">${ico}</span>
+        <div class="empty-text">${ttl}</div>
+        <div class="empty-sub">${sub}</div>
+      </div>`;
+    return;
+  }
+
+  const pLabel = { high:'Высокий', medium:'Средний', low:'Низкий' };
+  const sLabel = { todo:'Ожидает', progress:'В работе', done:'Выполнено' };
+
+  // Group overdue separately if relevant
+  let html = '';
+  if (filter === 'mine' || filter === 'all' || filter === 'by-me') {
+    const over  = list.filter(isOverdue);
+    const other = list.filter(t => !isOverdue(t));
+    if (over.length) {
+      html += `<div class="section-label" style="color:var(--high-fg)">⚠ Просроченные</div>`;
+      over.forEach(t => { html += taskHtml(t, pLabel, sLabel); });
+      if (other.length) html += `<div class="section-label">Актуальные</div>`;
+    }
+    other.forEach(t => { html += taskHtml(t, pLabel, sLabel); });
+  } else {
+    list.forEach(t => { html += taskHtml(t, pLabel, sLabel); });
+  }
+
+  container.innerHTML = html;
+}
+
+function taskHtml(task, pLabel, sLabel) {
+  const isDone    = task.status === 'done';
+  const overdue   = isOverdue(task);
+  const assignee  = getUser(task.assigneeId);
+  const creator   = getUser(task.createdById);
+  const isAssignedToMe = task.assigneeId === currentUser.id;
+  const canToggle = isAssignedToMe;
+
+  return `
+    <div class="task-card${isDone ? ' is-done':''} ${overdue ? ' is-overdue':''}"
+         onclick="${canToggle ? `toggleTask('${task.id}', '${task.status}')` : ''}">
+      <div class="chk${isDone ? ' chk-done':''}"
+           style="${canToggle ? '' : 'opacity:.3; cursor:default'}">✓</div>
+      <div class="task-body">
+        <div class="task-title">${esc(task.title)}</div>
+        ${task.desc ? `<div class="task-desc">${esc(task.desc)}</div>` : ''}
+        <div class="task-meta">
+          <span class="pbadge p-${task.priority}">${pLabel[task.priority] || ''}</span>
+          <span class="meta-chip${overdue ? ' overdue':''}">📅 ${fmtDate(task.deadline)}</span>
+          ${assignee && filter !== 'mine' && filter !== 'done' ? `
+            <span class="meta-chip">
+              <span class="task-av" style="background:${assignee.color}">${esc(assignee.short)}</span>
+              ${esc(assignee.name)}
+            </span>` : ''}
+          ${creator && filter !== 'mine' && filter !== 'done' ? `<span class="meta-chip">от ${esc(creator.name)}</span>` : ''}
+          ${creator && (filter === 'mine' || filter === 'done') && creator.id !== currentUser.id
+            ? `<span class="meta-chip">от ${esc(creator.name)}</span>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Toggle task done/undone ──────────────────────────────────
+async function toggleTask(taskId, currentStatus) {
+  const newStatus = currentStatus === 'done' ? 'todo' : 'done';
+  const { error } = await sb.from('tasks')
+    .update({ status: newStatus, updated_at: new Date().toISOString() })
+    .eq('id', taskId);
+  if (!error) {
+    showToast(newStatus === 'done' ? '✓ Задача выполнена!' : 'Задача возвращена в работу');
+    fetchTasks();
+  } else {
+    showToast('Ошибка при сохранении');
+  }
+}
+
+// ── Create task modal ────────────────────────────────────────
+function openModal() {
+  const sel = document.getElementById('f-assignee');
+  sel.innerHTML = USERS.map(u =>
+    `<option value="${u.id}"${u.id === currentUser.id ? ' selected':''}>${esc(u.name)} — ${esc(u.roleLabel)}</option>`
+  ).join('');
+
+  // Default deadline = today
+  document.getElementById('f-deadline').value = today();
+  document.getElementById('f-title').value    = '';
+  document.getElementById('f-desc').value     = '';
+  document.getElementById('f-priority').value = 'medium';
+
+  show('create-modal');
+  setTimeout(() => document.getElementById('f-title').focus(), 100);
+}
+
+function closeModal() { hide('create-modal'); }
+
+function handleModalBgClick(e) {
+  if (e.target === e.currentTarget) closeModal();
+}
+
+async function submitTask() {
+  const title      = document.getElementById('f-title').value.trim();
+  const desc       = document.getElementById('f-desc').value.trim();
+  const assigneeId = parseInt(document.getElementById('f-assignee').value);
+  const priority   = document.getElementById('f-priority').value;
+  const deadline   = document.getElementById('f-deadline').value;
+
+  if (!title) {
+    document.getElementById('f-title').focus();
+    showToast('Введите название задачи');
+    return;
+  }
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  btn.textContent = 'Сохраняем…';
+
+  const { error } = await sb.from('tasks').insert({
+    title,
+    description:     desc,
+    assignee_id:     assigneeId,
+    created_by_id:   currentUser.id,
+    priority,
+    status:          'todo',
+    deadline:        deadline || today(),
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Создать задачу';
+
+  if (!error) {
+    closeModal();
+    showToast('Задача создана!');
+    fetchTasks();
+  } else {
+    showToast('Ошибка при создании задачи');
+  }
+}
+
+// ── Init ─────────────────────────────────────────────────────
+(function init() {
+  try {
+    const uid = localStorage.getItem('be_worker_id');
+    if (uid) currentUser = USERS.find(u => u.id === parseInt(uid)) || null;
+  } catch {}
+
+  if (currentUser) {
+    const av = document.getElementById('hdr-av');
+    av.textContent      = currentUser.short;
+    av.style.background = currentUser.color;
+    document.getElementById('hdr-name').textContent = currentUser.name;
+  }
+
+  fetchTasks();
+  setInterval(fetchTasks, 5000);
+})();
+</script>
+</body>
+</html>
