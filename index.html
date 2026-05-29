@@ -550,36 +550,52 @@ function show(id)  { document.getElementById(id).classList.remove('hidden'); }
 function hide(id)  { document.getElementById(id).classList.add('hidden'); }
 
 // ── Fetch tasks from Supabase ────────────────────────────────
+let _loadingShown = true;
+
 async function fetchTasks() {
-  try {
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('timeout')), 8000)
-    );
-    const query = sb.from('tasks').select('*').order('created_at', { ascending: false });
-    const { data, error } = await Promise.race([query, timeout]);
-    if (error) {
+  // Show UI after 3s even if still loading
+  const showTimer = setTimeout(() => {
+    if (_loadingShown) {
+      _loadingShown = false;
       document.getElementById('online-dot').classList.add('offline');
       hide('loading-screen');
       if (currentUser) renderApp(); else renderLogin();
-      return;
     }
-    document.getElementById('online-dot').classList.remove('offline');
-    tasks = data.map(t => ({
-      id:          t.id,
-      title:       t.title,
-      desc:        t.description,
-      assigneeId:  t.assignee_id,
-      createdById: t.created_by_id,
-      priority:    t.priority,
-      status:      t.status,
-      deadline:    t.deadline,
-    }));
-    hide('loading-screen');
-    if (currentUser) renderApp(); else renderLogin();
+  }, 3000);
+
+  try {
+    const { data, error } = await sb.from('tasks').select('*').order('created_at', { ascending: false });
+    clearTimeout(showTimer);
+    if (error) {
+      document.getElementById('online-dot').classList.add('offline');
+    } else {
+      document.getElementById('online-dot').classList.remove('offline');
+      tasks = data.map(t => ({
+        id:          t.id,
+        title:       t.title,
+        desc:        t.description,
+        assigneeId:  t.assignee_id,
+        createdById: t.created_by_id,
+        priority:    t.priority,
+        status:      t.status,
+        deadline:    t.deadline,
+      }));
+    }
+    if (_loadingShown) {
+      _loadingShown = false;
+      hide('loading-screen');
+      if (currentUser) renderApp(); else renderLogin();
+    } else if (!error) {
+      if (currentUser) renderApp(); else renderLogin();
+    }
   } catch (e) {
+    clearTimeout(showTimer);
     document.getElementById('online-dot').classList.add('offline');
-    hide('loading-screen');
-    if (currentUser) renderApp(); else renderLogin();
+    if (_loadingShown) {
+      _loadingShown = false;
+      hide('loading-screen');
+      if (currentUser) renderApp(); else renderLogin();
+    }
   }
 }
 
