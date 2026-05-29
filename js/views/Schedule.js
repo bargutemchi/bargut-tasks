@@ -1,4 +1,5 @@
 /* global Vue, APP_STATE, APP_USERS, getUser, canManage, nextId, todayStr */
+(function () {
 const { defineComponent, ref, computed } = Vue;
 
 window.ScheduleView = defineComponent({
@@ -149,3 +150,4 @@ window.ScheduleView = defineComponent({
     </div>
   `,
 });
+})();
