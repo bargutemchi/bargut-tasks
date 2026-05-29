@@ -471,6 +471,14 @@
 
 <script>
 // ── Справочник сотрудников ─────────────────────────────────
+window.onerror = function(msg, src, line) {
+  document.body.style.background = '#fff';
+  document.body.innerHTML = '<div style="padding:24px;font-family:sans-serif;color:#222;font-size:14px">'
+    + '<b style="color:red">ОШИБКА:</b><br>' + msg
+    + '<br><br>Строка: ' + line + '</div>';
+  return true;
+};
+
 const USERS = [
   { id:1,  name:'Руслан',    short:'Р',  roleLabel:'Владелец',          color:'#08205e' },
   { id:2,  name:'Ирина',     short:'И',  roleLabel:'Зам. директора',    color:'#0d2d7a' },
