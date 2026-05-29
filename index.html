@@ -552,7 +552,11 @@ function hide(id)  { document.getElementById(id).classList.add('hidden'); }
 // ── Fetch tasks from Supabase ────────────────────────────────
 async function fetchTasks() {
   try {
-    const { data, error } = await sb.from('tasks').select('*').order('created_at', { ascending: false });
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), 8000)
+    );
+    const query = sb.from('tasks').select('*').order('created_at', { ascending: false });
+    const { data, error } = await Promise.race([query, timeout]);
     if (error) {
       document.getElementById('online-dot').classList.add('offline');
       hide('loading-screen');
