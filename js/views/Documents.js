@@ -1,4 +1,5 @@
 /* global Vue, APP_STATE, canManage, nextId */
+(function () {
 const { defineComponent, ref, computed } = Vue;
 
 const FOLDERS = [
@@ -140,3 +141,4 @@ window.DocumentsView = defineComponent({
     </div>
   `,
 });
+})();
