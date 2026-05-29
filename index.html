@@ -149,12 +149,13 @@
       flex-direction: column;
       align-items: center;
       padding: 40px 16px 32px;
-      background: linear-gradient(160deg, var(--navy) 0%, var(--navy-lt) 100%);
+      background: #08205e;
+      background: linear-gradient(160deg, #08205e 0%, #1a3d8a 100%);
     }
     .login-emblem    { font-size: 40px; margin-bottom: 10px; }
     .login-brand     { font-size: 26px; font-weight: 700; color: #fff; letter-spacing:.06em; }
     .login-brand-sub { font-size: 11px; color: rgba(255,255,255,.5); letter-spacing:.15em; text-transform:uppercase; margin: 4px 0 6px; }
-    .login-divider   { width: 40px; height: 2px; background: var(--gold); border-radius: 2px; margin: 0 auto 24px; }
+    .login-divider   { width: 40px; height: 2px; background: #b8972e; border-radius: 2px; margin: 0 auto 24px; }
     .login-prompt    { font-size: 15px; font-weight: 500; color: rgba(255,255,255,.75); margin-bottom: 18px; }
     .user-grid {
       display: grid;
@@ -551,35 +552,37 @@ function hide(id)  { document.getElementById(id).classList.add('hidden'); }
 
 // ── Fetch tasks from Supabase ────────────────────────────────
 async function fetchTasks() {
-  try {
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('timeout')), 3000)
-    );
-    const { data, error } = await Promise.race([
-      sb.from('tasks').select('*').order('created_at', { ascending: false }),
-      timeout
-    ]);
-    if (error) {
-      document.getElementById('online-dot').classList.add('offline');
-      hide('loading-screen');
-      if (currentUser) renderApp(); else renderLogin();
-      return;
-    }
-    document.getElementById('online-dot').classList.remove('offline');
-    tasks = data.map(t => ({
-      id:          t.id,
-      title:       t.title,
-      desc:        t.description,
-      assigneeId:  t.assignee_id,
-      createdById: t.created_by_id,
-      priority:    t.priority,
-      status:      t.status,
-      deadline:    t.deadline,
-    }));
+  var dot = document.getElementById('online-dot');
+  var fallback = setTimeout(function() {
+    dot.classList.add('offline');
     hide('loading-screen');
     if (currentUser) renderApp(); else renderLogin();
-  } catch (e) {
-    document.getElementById('online-dot').classList.add('offline');
+  }, 4000);
+  try {
+    var result = await sb.from('tasks').select('*').order('created_at', { ascending: false });
+    clearTimeout(fallback);
+    if (result.error) {
+      dot.classList.add('offline');
+    } else {
+      dot.classList.remove('offline');
+      tasks = result.data.map(function(t) {
+        return {
+          id:          t.id,
+          title:       t.title,
+          desc:        t.description,
+          assigneeId:  t.assignee_id,
+          createdById: t.created_by_id,
+          priority:    t.priority,
+          status:      t.status,
+          deadline:    t.deadline,
+        };
+      });
+    }
+    hide('loading-screen');
+    if (currentUser) renderApp(); else renderLogin();
+  } catch(e) {
+    clearTimeout(fallback);
+    dot.classList.add('offline');
     hide('loading-screen');
     if (currentUser) renderApp(); else renderLogin();
   }
