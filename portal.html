@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#08205e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Баргут Эмчи — Персонал</title>
+  <link rel="manifest" href="manifest.json">
+  <!-- Google Fonts (с фоллбэком если заблокированы) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Raleway:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <!-- Фон пока Vue не смонтировался -->
+  <div id="app" style="background:linear-gradient(160deg,#051440 0%,#08205e 100%); min-height:100vh;"></div>
+
+  <!-- Vue 3 + Router (локально, без CDN) -->
+  <script src="js/vendor/vue.global.prod.js"></script>
+  <script src="js/vendor/vue-router.global.prod.js"></script>
+
+  <!-- Хранилище данных и медиа -->
+  <script src="js/store.js"></script>
+  <script src="js/media-db.js"></script>
+
+  <!-- Экраны -->
+  <script src="js/views/Login.js"></script>
+  <script src="js/views/Dashboard.js"></script>
+  <script src="js/views/Tasks.js"></script>
+  <script src="js/views/Schedule.js"></script>
+  <script src="js/views/Cash.js"></script>
+  <script src="js/views/Phyto.js"></script>
+  <script src="js/views/Chat.js"></script>
+  <script src="js/views/Documents.js"></script>
+  <script src="js/views/Notifications.js"></script>
+  <script src="js/views/Departments.js"></script>
+
+  <!-- Приложение -->
+  <script src="js/app.js"></script>
+</body>
+</html>
