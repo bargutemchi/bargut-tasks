@@ -551,16 +551,27 @@ function show(id)  { document.getElementById(id).classList.remove('hidden'); }
 function hide(id)  { document.getElementById(id).classList.add('hidden'); }
 
 // ── Fetch tasks from Supabase ────────────────────────────────
+var appReady = false;
+
 async function fetchTasks() {
   var dot = document.getElementById('online-dot');
-  var fallback = setTimeout(function() {
-    dot.classList.add('offline');
-    hide('loading-screen');
-    if (currentUser) renderApp(); else renderLogin();
-  }, 4000);
+
+  // На первой загрузке — показать UI через 4с даже если нет ответа
+  var fallback = null;
+  if (!appReady) {
+    fallback = setTimeout(function() {
+      if (!appReady) {
+        appReady = true;
+        dot.classList.add('offline');
+        hide('loading-screen');
+        if (currentUser) renderApp(); else renderLogin();
+      }
+    }, 4000);
+  }
+
   try {
     var result = await sb.from('tasks').select('*').order('created_at', { ascending: false });
-    clearTimeout(fallback);
+    if (fallback) clearTimeout(fallback);
     if (result.error) {
       dot.classList.add('offline');
     } else {
@@ -577,14 +588,21 @@ async function fetchTasks() {
           deadline:    t.deadline,
         };
       });
+      if (appReady && currentUser) renderApp();
     }
-    hide('loading-screen');
-    if (currentUser) renderApp(); else renderLogin();
+    if (!appReady) {
+      appReady = true;
+      hide('loading-screen');
+      if (currentUser) renderApp(); else renderLogin();
+    }
   } catch(e) {
-    clearTimeout(fallback);
+    if (fallback) clearTimeout(fallback);
     dot.classList.add('offline');
-    hide('loading-screen');
-    if (currentUser) renderApp(); else renderLogin();
+    if (!appReady) {
+      appReady = true;
+      hide('loading-screen');
+      if (currentUser) renderApp(); else renderLogin();
+    }
   }
 }
 
