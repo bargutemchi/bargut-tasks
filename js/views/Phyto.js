@@ -1,4 +1,5 @@
 /* global Vue, APP_STATE, canManage, nextId */
+(function () {
 const { defineComponent, ref, computed } = Vue;
 
 window.PhytoView = defineComponent({
@@ -192,3 +193,4 @@ window.PhytoView = defineComponent({
     </div>
   `,
 });
+})();
