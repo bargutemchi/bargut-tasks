@@ -667,6 +667,8 @@ function setFilter(f) {
 
 function renderApp() {
   if (!currentUser) return;
+  show('app-screen');
+  hide('login-screen');
 
   const mine  = tasks.filter(t => t.assigneeId === currentUser.id);
   const done  = mine.filter(t => t.status === 'done').length;
