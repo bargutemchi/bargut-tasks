@@ -1,4 +1,5 @@
 /* global Vue, APP_STATE, canManage, nextId, timeAgo */
+(function () {
 const { defineComponent, ref, computed } = Vue;
 
 const TYPE_META = {
@@ -122,3 +123,4 @@ window.NotificationsView = defineComponent({
     </div>
   `,
 });
+})();
