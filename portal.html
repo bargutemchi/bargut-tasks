@@ -18,6 +18,24 @@
   <!-- Фон пока Vue не смонтировался -->
   <div id="app" style="background:linear-gradient(160deg,#051440 0%,#08205e 100%); min-height:100vh;"></div>
 
+  <!-- Перехват ошибок — показывает причину на экране -->
+  <script>
+    window.onerror = function(msg, src, line) {
+      var app = document.getElementById('app');
+      app.style.background = '#fff';
+      app.innerHTML = '<div style="padding:24px;font-family:monospace;font-size:13px;color:#c00">'
+        + '<b>ОШИБКА JS:</b><br>' + msg
+        + '<br><br>Файл: ' + src
+        + '<br>Строка: ' + line + '</div>';
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+      var app = document.getElementById('app');
+      app.style.background = '#fff';
+      app.innerHTML = '<div style="padding:24px;font-family:monospace;font-size:13px;color:#c00">'
+        + '<b>ОШИБКА Promise:</b><br>' + e.reason + '</div>';
+    });
+  </script>
+
   <!-- Vue 3 + Router (локально, без CDN) -->
   <script src="js/vendor/vue.global.prod.js"></script>
   <script src="js/vendor/vue-router.global.prod.js"></script>
