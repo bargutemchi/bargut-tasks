@@ -567,7 +567,22 @@ var appReady = false;
 
 async function fetchTasks() {
   var dot = document.getElementById('online-dot');
+
+  if (!appReady) {
+    var fallback = setTimeout(function() {
+      if (!appReady) {
+        appReady = true;
+        dot.classList.add('offline');
+        hide('loading-screen');
+        if (currentUser) renderApp(); else renderLogin();
+      }
+    }, 5000);
+  }
+
   var data = await ghLoad();
+
+  if (typeof fallback !== 'undefined') clearTimeout(fallback);
+
   if (data !== null) {
     dot.classList.remove('offline');
     tasks = data.map(function(t) {
@@ -585,6 +600,7 @@ async function fetchTasks() {
   } else {
     dot.classList.add('offline');
   }
+
   if (!appReady) {
     appReady = true;
     hide('loading-screen');
