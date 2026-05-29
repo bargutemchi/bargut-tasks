@@ -1,4 +1,5 @@
 /* global Vue */
+(function () {
 const { reactive, watch } = Vue;
 
 // ── Справочник сотрудников ─────────────────────────────────
@@ -177,3 +178,4 @@ window.timeAgo   = timeAgo;
 window.formatDate= formatDate;
 window.formatTime= formatTime;
 window.todayStr  = todayStr;
+})();
