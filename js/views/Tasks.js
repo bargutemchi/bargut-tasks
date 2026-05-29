@@ -1,4 +1,5 @@
 /* global Vue, APP_STATE, APP_USERS, getUser, canManage, nextId, formatDate, todayStr */
+(function () {
 const { defineComponent, ref, computed } = Vue;
 
 window.TasksView = defineComponent({
@@ -225,3 +226,4 @@ window.TasksView = defineComponent({
     </div>
   `,
 });
+})();
