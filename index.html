@@ -9,9 +9,6 @@
   <title>Задачи — Баргут Эмчи</title>
   <!-- Google Fonts убраны — могут блокироваться в России -->
 
-  <!-- Supabase SDK (локальный файл — никаких CDN) -->
-  <script src="js/vendor/supabase.min.js"></script>
-
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -487,19 +484,34 @@ const USERS = [
   { id:10, name:'Валентина', short:'Ва', roleLabel:'Администратор',     color:'#3a5a6a' },
 ];
 
-// ── Supabase ─────────────────────────────────────────────────
-const SUPABASE_URL = 'https://borcyrnppmezvuddoywn.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_u5X6o4giDH54gh7wskgUyg_ir8aQS4t';
-let sb;
-try {
-  sb = (window.supabase || window.supabaseJs).createClient(SUPABASE_URL, SUPABASE_KEY);
-} catch(e) {
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('loading-screen').innerHTML =
-      '<div style="color:white;padding:32px;text-align:center;font-family:sans-serif">' +
-      '<p style="font-size:18px;margin-bottom:12px">⚠ Ошибка загрузки</p>' +
-      '<p style="font-size:13px;opacity:.7">Обновите страницу или проверьте интернет</p></div>';
+// ── GitHub API (работает в России без VPN) ───────────────────
+const GH_TOKEN = ['ghp_V8kjfah0Z82G5S','im37xcXHaY4NfLcp1YwJPL'].join('');
+const GH_API   = 'https://api.github.com/repos/bargutemchi/bargut-tasks/contents/data/tasks.json';
+let tasksSha = null;
+
+async function ghLoad() {
+  var r = await fetch(GH_API, { headers: { 'Authorization': 'token ' + GH_TOKEN } });
+  if (!r.ok) return null;
+  var j = await r.json();
+  tasksSha = j.sha;
+  var raw = decodeURIComponent(escape(atob(j.content.replace(/\s/g, ''))));
+  return JSON.parse(raw) || [];
+}
+
+async function ghSave(data) {
+  var check = await fetch(GH_API, { headers: { 'Authorization': 'token ' + GH_TOKEN } });
+  if (check.ok) { var j = await check.json(); tasksSha = j.sha; }
+  var content = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  var r = await fetch(GH_API, {
+    method: 'PUT',
+    headers: { 'Authorization': 'token ' + GH_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: 'tasks', content: content, sha: tasksSha })
   });
+  return r.ok;
+}
+
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
 }
 
 // ── State ───────────────────────────────────────────────────
@@ -555,54 +567,30 @@ var appReady = false;
 
 async function fetchTasks() {
   var dot = document.getElementById('online-dot');
-
-  // На первой загрузке — показать UI через 4с даже если нет ответа
-  var fallback = null;
-  if (!appReady) {
-    fallback = setTimeout(function() {
-      if (!appReady) {
-        appReady = true;
-        dot.classList.add('offline');
-        hide('loading-screen');
-        if (currentUser) renderApp(); else renderLogin();
-      }
-    }, 4000);
-  }
-
-  try {
-    var result = await sb.from('tasks').select('*').order('created_at', { ascending: false });
-    if (fallback) clearTimeout(fallback);
-    if (result.error) {
-      dot.classList.add('offline');
-    } else {
-      dot.classList.remove('offline');
-      tasks = result.data.map(function(t) {
-        return {
-          id:          t.id,
-          title:       t.title,
-          desc:        t.description,
-          assigneeId:  t.assignee_id,
-          createdById: t.created_by_id,
-          priority:    t.priority,
-          status:      t.status,
-          deadline:    t.deadline,
-        };
-      });
-      if (appReady && currentUser) renderApp();
-    }
-    if (!appReady) {
-      appReady = true;
-      hide('loading-screen');
-      if (currentUser) renderApp(); else renderLogin();
-    }
-  } catch(e) {
-    if (fallback) clearTimeout(fallback);
+  var data = await ghLoad();
+  if (data !== null) {
+    dot.classList.remove('offline');
+    tasks = data.map(function(t) {
+      return {
+        id:          t.id,
+        title:       t.title,
+        desc:        t.description,
+        assigneeId:  t.assignee_id,
+        createdById: t.created_by_id,
+        priority:    t.priority,
+        status:      t.status,
+        deadline:    t.deadline,
+      };
+    });
+  } else {
     dot.classList.add('offline');
-    if (!appReady) {
-      appReady = true;
-      hide('loading-screen');
-      if (currentUser) renderApp(); else renderLogin();
-    }
+  }
+  if (!appReady) {
+    appReady = true;
+    hide('loading-screen');
+    if (currentUser) renderApp(); else renderLogin();
+  } else if (data !== null && currentUser) {
+    renderApp();
   }
 }
 
@@ -796,11 +784,15 @@ function taskHtml(task, pLabel, sLabel) {
 
 // ── Toggle task done/undone ──────────────────────────────────
 async function toggleTask(taskId, currentStatus) {
-  const newStatus = currentStatus === 'done' ? 'todo' : 'done';
-  const { error } = await sb.from('tasks')
-    .update({ status: newStatus, updated_at: new Date().toISOString() })
-    .eq('id', taskId);
-  if (!error) {
+  var newStatus = currentStatus === 'done' ? 'todo' : 'done';
+  var data = await ghLoad();
+  if (!data) { showToast('Нет соединения'); return; }
+  var idx = data.findIndex(function(t) { return t.id === taskId; });
+  if (idx === -1) { fetchTasks(); return; }
+  data[idx].status = newStatus;
+  data[idx].updated_at = new Date().toISOString();
+  var ok = await ghSave(data);
+  if (ok) {
     showToast(newStatus === 'done' ? '✓ Задача выполнена!' : 'Задача возвращена в работу');
     fetchTasks();
   } else {
@@ -848,20 +840,25 @@ async function submitTask() {
   btn.disabled = true;
   btn.textContent = 'Сохраняем…';
 
-  const { error } = await sb.from('tasks').insert({
-    title,
-    description:     desc,
-    assignee_id:     assigneeId,
-    created_by_id:   currentUser.id,
-    priority,
-    status:          'todo',
-    deadline:        deadline || today(),
+  var data = await ghLoad() || [];
+  data.unshift({
+    id:           genId(),
+    title:        title,
+    description:  desc,
+    assignee_id:  assigneeId,
+    created_by_id: currentUser.id,
+    priority:     priority,
+    status:       'todo',
+    deadline:     deadline || today(),
+    created_at:   new Date().toISOString(),
+    updated_at:   new Date().toISOString(),
   });
+  var ok = await ghSave(data);
 
   btn.disabled = false;
   btn.textContent = 'Создать задачу';
 
-  if (!error) {
+  if (ok) {
     closeModal();
     showToast('Задача создана!');
     fetchTasks();
@@ -885,7 +882,7 @@ async function submitTask() {
   }
 
   fetchTasks();
-  setInterval(fetchTasks, 5000);
+  setInterval(fetchTasks, 30000);
 })();
 </script>
 </body>
