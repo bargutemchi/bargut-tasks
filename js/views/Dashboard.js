@@ -1,4 +1,5 @@
 /* global Vue, VueRouter, APP_STATE, getUser, canManage, todayStr, formatDate */
+(function () {
 const { defineComponent, computed } = Vue;
 const { useRouter } = VueRouter;
 
@@ -154,3 +155,4 @@ window.DashboardView = defineComponent({
     </div>
   `,
 });
+})();
