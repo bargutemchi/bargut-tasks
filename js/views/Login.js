@@ -1,4 +1,5 @@
 /* global Vue, VueRouter, APP_STATE, APP_USERS */
+(function () {
 const { defineComponent } = Vue;
 const { useRouter } = VueRouter;
 
@@ -48,3 +49,4 @@ window.LoginView = defineComponent({
     </div>
   `,
 });
+})();
