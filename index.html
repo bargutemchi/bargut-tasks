@@ -359,6 +359,44 @@
     .btn-submit:hover { background: var(--navy-mid); }
     .btn-submit:disabled { opacity: .6; cursor: default; }
 
+    /* ══ SEARCH ══ */
+    .search-wrap { position: relative; margin-bottom: 12px; }
+    .search-input {
+      width: 100%; padding: 10px 14px 10px 38px;
+      border: 1px solid var(--border); border-radius: 12px;
+      font-family: inherit; font-size: 14px; color: var(--text);
+      background: var(--card); outline: none; transition: border-color .2s;
+    }
+    .search-input:focus { border-color: var(--navy); }
+    .search-icon {
+      position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+      color: var(--muted); font-size: 15px; pointer-events: none;
+    }
+    .search-input:not(:placeholder-shown) ~ .search-clear { display: flex; }
+    .search-clear {
+      display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: var(--muted); color: #fff; border: none; border-radius: 50%;
+      width: 18px; height: 18px; font-size: 11px; cursor: pointer;
+      align-items: center; justify-content: center; line-height: 1;
+    }
+
+    /* ══ DETAIL MODAL ══ */
+    .detail-title { font-size: 18px; font-weight: 700; color: var(--navy); margin-bottom: 10px; line-height: 1.4; }
+    .detail-desc  { font-size: 13px; color: var(--text); line-height: 1.6; padding: 12px; background: var(--bg); border-radius: 10px; margin-bottom: 14px; }
+    .detail-rows  { margin-bottom: 16px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .detail-row   { display: flex; align-items: center; gap: 10px; padding: 10px 14px; font-size: 13px; border-bottom: 1px solid var(--border); }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-lbl   { color: var(--muted); font-weight: 600; min-width: 90px; flex-shrink: 0; }
+    .detail-val   { color: var(--text); }
+    .detail-val.overdue { color: var(--high-fg); font-weight: 700; }
+    .detail-actions { display: flex; flex-direction: column; gap: 8px; }
+    .btn-d-done   { width:100%; padding:13px; background:var(--gold); color:#fff; border:none; border-radius:12px; font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; transition:background .2s; }
+    .btn-d-done:hover   { background:#9a7d25; }
+    .btn-d-edit   { width:100%; padding:11px; background:var(--bg); color:var(--navy); border:1px solid var(--border); border-radius:12px; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; transition:background .2s; }
+    .btn-d-edit:hover   { background:var(--border); }
+    .btn-d-delete { width:100%; padding:11px; background:#fff5f5; color:var(--red); border:1px solid #fca5a5; border-radius:12px; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; transition:background .2s; }
+    .btn-d-delete:hover { background:#fee2e2; }
+
     /* ══ TOAST ══ */
     #toast {
       position: fixed; bottom: 24px; left: 50%;
@@ -417,6 +455,13 @@
       <div class="progress-fill" id="pfill" style="width:0%"></div>
     </div>
 
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input id="search-input" class="search-input" placeholder="Поиск задач…"
+             oninput="setSearch(this.value)" autocomplete="off">
+      <button class="search-clear" onclick="clearSearch()" title="Очистить">✕</button>
+    </div>
+
     <div class="filter-bar">
       <button class="ftab active" data-f="mine"    onclick="setFilter('mine')">   Мои <span class="cnt" id="c-mine"></span></button>
       <button class="ftab"        data-f="by-me"   onclick="setFilter('by-me')">  Я дал <span class="cnt" id="c-byme"></span></button>
@@ -433,7 +478,7 @@
   <div class="modal-bg" onclick="handleModalBgClick(event)">
     <div class="modal-sheet" onclick="event.stopPropagation()">
       <div class="modal-hdr">
-        <h2>Новая задача</h2>
+        <h2 id="modal-title">Новая задача</h2>
         <button class="modal-close" onclick="closeModal()">✕</button>
       </div>
       <div class="modal-body">
@@ -464,6 +509,49 @@
           </div>
         </div>
         <button class="btn-submit" id="btn-submit" onclick="submitTask()">Создать задачу</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ DETAIL MODAL ══════ -->
+<div id="detail-modal" class="hidden">
+  <div class="modal-bg" onclick="handleDetailBgClick(event)">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="modal-hdr">
+        <h2>Задача</h2>
+        <button class="modal-close" onclick="closeDetail()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-title" id="d-title"></div>
+        <div class="detail-desc"  id="d-desc"></div>
+        <div class="detail-rows">
+          <div class="detail-row">
+            <span class="detail-lbl">Исполнитель</span>
+            <span class="detail-val" id="d-assignee"></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-lbl">Поставил</span>
+            <span class="detail-val" id="d-creator"></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-lbl">Приоритет</span>
+            <span id="d-priority" class="pbadge"></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-lbl">Срок</span>
+            <span class="detail-val" id="d-deadline"></span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-lbl">Статус</span>
+            <span class="detail-val" id="d-status"></span>
+          </div>
+        </div>
+        <div class="detail-actions">
+          <button class="btn-d-done"   id="d-btn-toggle"></button>
+          <button class="btn-d-edit"   id="d-btn-edit">✏ Редактировать</button>
+          <button class="btn-d-delete" id="d-btn-delete">🗑 Удалить задачу</button>
+        </div>
       </div>
     </div>
   </div>
@@ -525,10 +613,12 @@ function genId() {
 }
 
 // ── State ───────────────────────────────────────────────────
-let currentUser = null;
-let tasks       = [];
-let filter      = 'mine';
-let toastTimer  = null;
+let currentUser   = null;
+let tasks         = [];
+let filter        = 'mine';
+let toastTimer    = null;
+let searchQuery   = '';
+let editingTaskId = null;
 
 // ── Helpers ─────────────────────────────────────────────────
 const _fmt  = d => d.toISOString().split('T')[0];
@@ -738,6 +828,14 @@ function renderTasks() {
     return (a.deadline || '').localeCompare(b.deadline || '');
   });
 
+  // Поиск
+  if (searchQuery) {
+    list = list.filter(t =>
+      t.title.toLowerCase().includes(searchQuery) ||
+      (t.desc || '').toLowerCase().includes(searchQuery)
+    );
+  }
+
   const container = document.getElementById('tasks-list');
 
   if (list.length === 0) {
@@ -788,9 +886,10 @@ function taskHtml(task, pLabel, sLabel) {
 
   return `
     <div class="task-card${isDone ? ' is-done':''} ${overdue ? ' is-overdue':''}"
-         onclick="${canToggle ? `toggleTask('${task.id}', '${task.status}')` : ''}">
+         onclick="openDetail('${task.id}')">
       <div class="chk${isDone ? ' chk-done':''}"
-           style="${canToggle ? '' : 'opacity:.3; cursor:default'}">✓</div>
+           style="${canToggle ? '' : 'opacity:.3; cursor:default'}"
+           onclick="event.stopPropagation(); ${canToggle ? `toggleTask('${task.id}', '${task.status}')` : `showToast('Только исполнитель может отмечать')`}">✓</div>
       <div class="task-body">
         <div class="task-title">${esc(task.title)}</div>
         ${task.desc ? `<div class="task-desc">${esc(task.desc)}</div>` : ''}
@@ -828,14 +927,121 @@ async function toggleTask(taskId, currentStatus) {
   }
 }
 
+// ── Search ───────────────────────────────────────────────────
+function setSearch(val) {
+  searchQuery = val.trim().toLowerCase();
+  renderTasks();
+}
+
+function clearSearch() {
+  searchQuery = '';
+  document.getElementById('search-input').value = '';
+  renderTasks();
+}
+
+// ── Detail modal ─────────────────────────────────────────────
+function openDetail(taskId) {
+  const task = tasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  const assignee  = getUser(task.assigneeId);
+  const creator   = getUser(task.createdById);
+  const canEdit   = currentUser.id === task.createdById || currentUser.id === 1 || currentUser.id === 2;
+  const canToggle = currentUser.id === task.assigneeId;
+  const isDone    = task.status === 'done';
+  const overdue   = isOverdue(task);
+  const pLabel    = { high:'Высокий', medium:'Средний', low:'Низкий' };
+
+  document.getElementById('d-title').textContent = task.title;
+
+  const descEl = document.getElementById('d-desc');
+  if (task.desc) { descEl.textContent = task.desc; descEl.style.display = ''; }
+  else           { descEl.style.display = 'none'; }
+
+  document.getElementById('d-assignee').textContent = assignee ? `${assignee.name} — ${assignee.roleLabel}` : '—';
+  document.getElementById('d-creator').textContent  = creator  ? creator.name : '—';
+
+  const prEl = document.getElementById('d-priority');
+  prEl.className   = `pbadge p-${task.priority}`;
+  prEl.textContent = pLabel[task.priority] || task.priority;
+
+  const dlEl = document.getElementById('d-deadline');
+  dlEl.textContent = task.deadline ? fmtDate(task.deadline) : '—';
+  dlEl.className   = overdue ? 'detail-val overdue' : 'detail-val';
+
+  const stEl = document.getElementById('d-status');
+  if (isDone)       { stEl.textContent = '✓ Выполнено';   stEl.style.color = '#166534'; }
+  else if (overdue) { stEl.textContent = '⚠ Просрочено';  stEl.style.color = 'var(--red)'; }
+  else              { stEl.textContent = '○ Активна';      stEl.style.color = 'var(--text)'; }
+
+  const btnToggle = document.getElementById('d-btn-toggle');
+  btnToggle.style.display = canToggle ? '' : 'none';
+  btnToggle.textContent   = isDone ? '↩ Вернуть в работу' : '✓ Отметить выполненной';
+  btnToggle.onclick       = () => { closeDetail(); toggleTask(task.id, task.status); };
+
+  const btnEdit = document.getElementById('d-btn-edit');
+  btnEdit.style.display = canEdit ? '' : 'none';
+  btnEdit.onclick       = () => { closeDetail(); openEdit(task.id); };
+
+  const btnDelete = document.getElementById('d-btn-delete');
+  btnDelete.style.display = canEdit ? '' : 'none';
+  btnDelete.onclick       = () => deleteTask(task.id);
+
+  show('detail-modal');
+}
+
+function closeDetail() { hide('detail-modal'); }
+
+function handleDetailBgClick(e) {
+  if (e.target === e.currentTarget) closeDetail();
+}
+
+// ── Edit task ────────────────────────────────────────────────
+function openEdit(taskId) {
+  const task = tasks.find(t => t.id === taskId);
+  if (!task) return;
+  editingTaskId = taskId;
+
+  const sel = document.getElementById('f-assignee');
+  sel.innerHTML = USERS.map(u =>
+    `<option value="${u.id}"${u.id === task.assigneeId ? ' selected':''}>${esc(u.name)} — ${esc(u.roleLabel)}</option>`
+  ).join('');
+
+  document.getElementById('f-title').value    = task.title;
+  document.getElementById('f-desc').value     = task.desc || '';
+  document.getElementById('f-priority').value = task.priority;
+  document.getElementById('f-deadline').value = task.deadline || today();
+  document.getElementById('modal-title').textContent = 'Редактировать задачу';
+  document.getElementById('btn-submit').textContent  = 'Сохранить изменения';
+
+  show('create-modal');
+  setTimeout(() => document.getElementById('f-title').focus(), 100);
+}
+
+// ── Delete task ──────────────────────────────────────────────
+async function deleteTask(taskId) {
+  if (!confirm('Удалить задачу? Это действие нельзя отменить.')) return;
+  closeDetail();
+
+  var data = await ghLoad();
+  if (!data) { showToast('Нет соединения'); return; }
+
+  var ok = await ghSave(data.filter(t => t.id !== taskId));
+  showToast(ok ? 'Задача удалена' : 'Ошибка при удалении');
+  if (ok) fetchTasks();
+}
+
 // ── Create task modal ────────────────────────────────────────
 function openModal() {
+  editingTaskId = null;
+  document.getElementById('modal-title').textContent = 'Новая задача';
+  document.getElementById('btn-submit').textContent  = 'Создать задачу';
+
   const sel = document.getElementById('f-assignee');
   sel.innerHTML = USERS.map(u =>
     `<option value="${u.id}"${u.id === currentUser.id ? ' selected':''}>${esc(u.name)} — ${esc(u.roleLabel)}</option>`
   ).join('');
 
-  // Default deadline = today
   document.getElementById('f-deadline').value = today();
   document.getElementById('f-title').value    = '';
   document.getElementById('f-desc').value     = '';
@@ -845,7 +1051,7 @@ function openModal() {
   setTimeout(() => document.getElementById('f-title').focus(), 100);
 }
 
-function closeModal() { hide('create-modal'); }
+function closeModal() { hide('create-modal'); editingTaskId = null; }
 
 function handleModalBgClick(e) {
   if (e.target === e.currentTarget) closeModal();
@@ -865,33 +1071,48 @@ async function submitTask() {
   }
 
   const btn = document.getElementById('btn-submit');
-  btn.disabled = true;
+  btn.disabled    = true;
   btn.textContent = 'Сохраняем…';
 
   var data = await ghLoad() || [];
-  data.unshift({
-    id:           genId(),
-    title:        title,
-    description:  desc,
-    assignee_id:  assigneeId,
-    created_by_id: currentUser.id,
-    priority:     priority,
-    status:       'todo',
-    deadline:     deadline || today(),
-    created_at:   new Date().toISOString(),
-    updated_at:   new Date().toISOString(),
-  });
+
+  if (editingTaskId) {
+    var idx = data.findIndex(t => t.id === editingTaskId);
+    if (idx !== -1) {
+      data[idx].title       = title;
+      data[idx].description = desc;
+      data[idx].assignee_id = assigneeId;
+      data[idx].priority    = priority;
+      data[idx].deadline    = deadline || today();
+      data[idx].updated_at  = new Date().toISOString();
+    }
+  } else {
+    data.unshift({
+      id:            genId(),
+      title:         title,
+      description:   desc,
+      assignee_id:   assigneeId,
+      created_by_id: currentUser.id,
+      priority:      priority,
+      status:        'todo',
+      deadline:      deadline || today(),
+      created_at:    new Date().toISOString(),
+      updated_at:    new Date().toISOString(),
+    });
+  }
+
   var ok = await ghSave(data);
 
-  btn.disabled = false;
-  btn.textContent = 'Создать задачу';
+  btn.disabled    = false;
+  btn.textContent = editingTaskId ? 'Сохранить изменения' : 'Создать задачу';
 
   if (ok) {
+    const msg = editingTaskId ? 'Задача обновлена!' : 'Задача создана!';
     closeModal();
-    showToast('Задача создана!');
+    showToast(msg);
     fetchTasks();
   } else {
-    showToast('Ошибка при создании задачи');
+    showToast('Ошибка при сохранении');
   }
 }
 
