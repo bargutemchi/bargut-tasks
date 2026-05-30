@@ -89,13 +89,23 @@ const App = defineComponent({
       router.push('/');
     }
 
+    async function forceUpdate() {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const r of regs) await r.unregister();
+      }
+      const keys = await caches.keys();
+      for (const k of keys) await caches.delete(k);
+      window.location.reload(true);
+    }
+
     function isActive(path) {
       if (path === '/more') return NAV_MORE.some(n => currentRoute.value.startsWith(n.path));
       return currentRoute.value.startsWith(path);
     }
 
     return { showMore, currentRoute, isLoggedIn, user, unread,
-             navTo, logout, isActive, NAV_MAIN, NAV_MORE };
+             navTo, logout, isActive, NAV_MAIN, NAV_MORE, forceUpdate };
   },
 
   template: `
@@ -113,6 +123,7 @@ const App = defineComponent({
           🔔
           <div v-if="unread > 0" class="notif-badge"></div>
         </div>
+        <div class="header-notif" @click="forceUpdate" title="Обновить приложение">🔄</div>
         <div class="header-user" @click="logout" title="Выйти">
           <div class="avatar" :style="{ background: user.color }">{{ user.short }}</div>
         </div>
