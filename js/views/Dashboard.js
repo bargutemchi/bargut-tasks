@@ -67,7 +67,7 @@ window.DashboardView = defineComponent({
 
       <!-- Stats (only for owner/admin) -->
       <template v-if="canManage(user)">
-        <div class="stats-row">
+        <div class="stats-row" style="grid-template-columns:repeat(2,1fr);">
           <div class="stat-card">
             <div class="stat-value" style="color:#e53e3e;">{{ taskStats.todo }}</div>
             <div class="stat-label">Ожидают</div>
@@ -75,10 +75,6 @@ window.DashboardView = defineComponent({
           <div class="stat-card">
             <div class="stat-value" style="color:#dd6b20;">{{ taskStats.progress }}</div>
             <div class="stat-label">В работе</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value" style="color:#08205e;">{{ totalIncome.toLocaleString('ru') }}₽</div>
-            <div class="stat-label">Выручка сегодня</div>
           </div>
         </div>
       </template>
