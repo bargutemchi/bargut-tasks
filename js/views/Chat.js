@@ -184,6 +184,21 @@ window.ChatView = defineComponent({
       });
 
       if (error) alert('Ошибка отправки: ' + error.message);
+
+      // Push через ntfy.sh (работает когда приложение закрыто)
+      if (!error) {
+        const notifText = text || '📷 Фото';
+        fetch('https://ntfy.sh/bargut-emchi-2026', {
+          method: 'POST',
+          headers: {
+            'Title': user.value.name,
+            'Priority': 'default',
+            'Tags': 'hospital',
+          },
+          body: notifText,
+        }).catch(() => {}); // не блокируем если нет сети
+      }
+
       newMsg.value  = '';
       uploading.value = false;
     }
