@@ -144,85 +144,89 @@ window.TasksView = defineComponent({
       </div>
 
       <!-- Task Detail Modal -->
-      <div v-if="showDetail" class="modal-overlay" @click.self="showDetail=null">
-        <div class="modal-sheet">
-          <div class="modal-header">
-            <h2 class="modal-title">Задача</h2>
-            <button class="modal-close" @click="showDetail=null">✕</button>
-          </div>
-          <div>
-            <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
-              <span class="badge" :class="statusClass[showDetail.status]">{{ statusLabel[showDetail.status] }}</span>
-              <span class="badge"
-                    :style="{ background: showDetail.priority==='high'?'#FFF5F5':showDetail.priority==='medium'?'#FFFBEB':'#F0FFF4',
-                              color: showDetail.priority==='high'?'#c53030':showDetail.priority==='medium'?'#b7791f':'#276749' }">
-                {{ priorityLabel[showDetail.priority] }} приоритет
-              </span>
+      <teleport to="body">
+        <div v-if="showDetail" class="modal-overlay" @click.self="showDetail=null">
+          <div class="modal-sheet">
+            <div class="modal-header">
+              <h2 class="modal-title">Задача</h2>
+              <button class="modal-close" @click="showDetail=null">✕</button>
             </div>
-            <h3 style="font-size:17px; font-weight:700; color:#1a2a4a; margin-bottom:8px;">{{ showDetail.title }}</h3>
-            <p v-if="showDetail.desc"
-               style="font-size:14px; color:#4a5a7a; line-height:1.6; margin-bottom:12px;">{{ showDetail.desc }}</p>
-            <div style="font-size:13px; color:#4a5a7a; margin-bottom:6px;">
-              👤 Исполнитель: <strong>{{ getUser(showDetail.assigneeId)?.name }}</strong>
-            </div>
-            <div style="font-size:13px; color:#4a5a7a; margin-bottom:6px;">
-              📅 Срок: <strong>{{ showDetail.deadline }}</strong>
-            </div>
-            <div style="font-size:13px; color:#4a5a7a; margin-bottom:20px;">
-              ✍️ Создал: <strong>{{ getUser(showDetail.createdBy)?.name }}</strong>
-            </div>
-            <div style="display:flex; gap:10px; flex-wrap:wrap;">
-              <button v-if="showDetail.status !== 'done' && (showDetail.assigneeId===user.id || canManage(user))"
-                      class="btn btn-gold" @click="advance(showDetail); showDetail=null">
-                ✓ Взять в работу / Выполнено
-              </button>
-              <button v-if="canManage(user)" class="btn btn-danger btn-sm" @click="deleteTask(showDetail)">
-                🗑 Удалить
-              </button>
+            <div>
+              <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+                <span class="badge" :class="statusClass[showDetail.status]">{{ statusLabel[showDetail.status] }}</span>
+                <span class="badge"
+                      :style="{ background: showDetail.priority==='high'?'#FFF5F5':showDetail.priority==='medium'?'#FFFBEB':'#F0FFF4',
+                                color: showDetail.priority==='high'?'#c53030':showDetail.priority==='medium'?'#b7791f':'#276749' }">
+                  {{ priorityLabel[showDetail.priority] }} приоритет
+                </span>
+              </div>
+              <h3 style="font-size:17px; font-weight:700; color:#1a2a4a; margin-bottom:8px;">{{ showDetail.title }}</h3>
+              <p v-if="showDetail.desc"
+                 style="font-size:14px; color:#4a5a7a; line-height:1.6; margin-bottom:12px;">{{ showDetail.desc }}</p>
+              <div style="font-size:13px; color:#4a5a7a; margin-bottom:6px;">
+                👤 Исполнитель: <strong>{{ getUser(showDetail.assigneeId)?.name }}</strong>
+              </div>
+              <div style="font-size:13px; color:#4a5a7a; margin-bottom:6px;">
+                📅 Срок: <strong>{{ showDetail.deadline }}</strong>
+              </div>
+              <div style="font-size:13px; color:#4a5a7a; margin-bottom:20px;">
+                ✍️ Создал: <strong>{{ getUser(showDetail.createdBy)?.name }}</strong>
+              </div>
+              <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button v-if="showDetail.status !== 'done' && (showDetail.assigneeId===user.id || canManage(user))"
+                        class="btn btn-gold" @click="advance(showDetail); showDetail=null">
+                  ✓ Взять в работу / Выполнено
+                </button>
+                <button v-if="canManage(user)" class="btn btn-danger btn-sm" @click="deleteTask(showDetail)">
+                  🗑 Удалить
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </teleport>
 
       <!-- Create Task Modal -->
-      <div v-if="showCreate" class="modal-overlay" @click.self="showCreate=false">
-        <div class="modal-sheet">
-          <div class="modal-header">
-            <h2 class="modal-title">Новая задача</h2>
-            <button class="modal-close" @click="showCreate=false">✕</button>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Название *</label>
-            <input class="form-control" v-model="newTask.title" placeholder="Что нужно сделать?">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Описание</label>
-            <textarea class="form-control" v-model="newTask.desc" placeholder="Подробности..."></textarea>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Исполнитель</label>
-            <select class="form-control" v-model="newTask.assigneeId">
-              <option :value="null">Выберите сотрудника</option>
-              <option v-for="u in USERS" :key="u.id" :value="u.id">{{ u.name }} — {{ u.roleLabel }}</option>
-            </select>
-          </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <teleport to="body">
+        <div v-if="showCreate" class="modal-overlay" @click.self="showCreate=false">
+          <div class="modal-sheet">
+            <div class="modal-header">
+              <h2 class="modal-title">Новая задача</h2>
+              <button class="modal-close" @click="showCreate=false">✕</button>
+            </div>
             <div class="form-group">
-              <label class="form-label">Приоритет</label>
-              <select class="form-control" v-model="newTask.priority">
-                <option value="high">🔴 Высокий</option>
-                <option value="medium">🟡 Средний</option>
-                <option value="low">🟢 Низкий</option>
+              <label class="form-label">Название *</label>
+              <input class="form-control" v-model="newTask.title" placeholder="Что нужно сделать?">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Описание</label>
+              <textarea class="form-control" v-model="newTask.desc" placeholder="Подробности..."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Исполнитель</label>
+              <select class="form-control" v-model="newTask.assigneeId">
+                <option :value="null">Выберите сотрудника</option>
+                <option v-for="u in USERS" :key="u.id" :value="u.id">{{ u.name }} — {{ u.roleLabel }}</option>
               </select>
             </div>
-            <div class="form-group">
-              <label class="form-label">Срок</label>
-              <input type="date" class="form-control" v-model="newTask.deadline">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div class="form-group">
+                <label class="form-label">Приоритет</label>
+                <select class="form-control" v-model="newTask.priority">
+                  <option value="high">🔴 Высокий</option>
+                  <option value="medium">🟡 Средний</option>
+                  <option value="low">🟢 Низкий</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Срок</label>
+                <input type="date" class="form-control" v-model="newTask.deadline">
+              </div>
             </div>
+            <button class="btn btn-primary btn-block" @click="createTask">Создать задачу</button>
           </div>
-          <button class="btn btn-primary btn-block" @click="createTask">Создать задачу</button>
         </div>
-      </div>
+      </teleport>
     </div>
   `,
 });
