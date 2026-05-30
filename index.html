@@ -7,6 +7,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Задачи — Баргут Эмчи</title>
+  <link rel="manifest" href="/bargut-tasks/manifest.json">
+  <link rel="apple-touch-icon" href="/bargut-tasks/icon-192.png">
   <!-- Google Fonts убраны — могут блокироваться в России -->
 
   <style>
@@ -909,6 +911,10 @@ async function submitTask() {
 
   fetchTasks();
   setInterval(fetchTasks, 30000);
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/bargut-tasks/sw.js');
+  }
 })();
 </script>
 </body>
