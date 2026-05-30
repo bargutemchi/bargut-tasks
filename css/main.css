@@ -322,7 +322,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 .modal-sheet {
   background: var(--card);
   border-radius: 20px 20px 0 0;
-  padding: 20px 16px calc(var(--nav-h) + 20px);
+  padding: 20px 16px 20px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
