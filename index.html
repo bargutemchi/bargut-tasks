@@ -337,7 +337,7 @@
     }
     .modal-hdr h2    { font-size: 18px; font-weight: 700; color: var(--navy); }
     .modal-close     { background:none; border:none; font-size:20px; color:var(--muted); cursor:pointer; padding:4px; }
-    .modal-body      { padding: 16px 20px 24px; }
+    .modal-body      { padding: 16px 20px calc(env(safe-area-inset-bottom, 0px) + 72px); }
     .form-group      { margin-bottom: 14px; }
     .form-label      { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing:.06em; color:var(--muted); display:block; margin-bottom:6px; }
     .form-control {
