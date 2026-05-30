@@ -52,6 +52,19 @@ window.ChatView = defineComponent({
     const lightbox     = ref(null);
     const photoInput   = ref(null);
     const loadError    = ref(null);
+    const onlineSet    = Vue.reactive(new Set());
+
+    // Слушаем изменения онлайн-статуса
+    if (window.Presence) {
+      window.Presence.onChange(updated => {
+        onlineSet.clear();
+        updated.forEach(id => onlineSet.add(id));
+      });
+      // Инициализируем текущим состоянием
+      window.Presence.onlineUsers.forEach(id => onlineSet.add(id));
+    }
+
+    function isOnline(userId) { return onlineSet.has(Number(userId)); }
 
     // ── Комнаты ─────────────────────────────────────────────
     const rooms = computed(() => {
@@ -190,6 +203,7 @@ window.ChatView = defineComponent({
       triggerPhoto, onPhotoSelected, cancelMedia,
       openLightbox, closeLightbox,
       formatTime: window.formatTime,
+      isOnline,
     };
   },
 
@@ -209,13 +223,17 @@ window.ChatView = defineComponent({
           <div v-for="room in rooms" :key="room.id"
                style="flex-shrink:0; cursor:pointer;" @click="selectRoom(room.id)">
             <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:56px;">
-              <div class="avatar"
-                   :style="{
-                     background: room.user ? room.user.color : '#08205e',
-                     outline: roomId===room.id ? '2px solid #f7d894' : '2px solid transparent',
-                     outlineOffset: '2px'
-                   }">
-                {{ room.user ? room.user.short : '👥' }}
+              <div style="position:relative; display:inline-block;">
+                <div class="avatar"
+                     :style="{
+                       background: room.user ? room.user.color : '#08205e',
+                       outline: roomId===room.id ? '2px solid #f7d894' : '2px solid transparent',
+                       outlineOffset: '2px'
+                     }">
+                  {{ room.user ? room.user.short : '👥' }}
+                </div>
+                <span v-if="room.user && isOnline(room.user.id)"
+                      style="position:absolute; bottom:0; right:0; width:10px; height:10px; background:#38a169; border-radius:50%; border:2px solid #fff;"></span>
               </div>
               <span style="font-size:10px; color:#4a5a7a; text-align:center; max-width:56px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                 {{ room.id==='all' ? 'Все' : room.label }}
