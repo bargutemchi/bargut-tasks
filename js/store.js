@@ -98,8 +98,26 @@ function formatTime(str) {
 
 function todayStr() { return fmt(new Date()); }
 
-window.APP_STATE  = state;
-window.APP_USERS  = USERS;
+async function refreshUsers() {
+  if (!window.supabaseClient) return;
+  const { data } = await window.supabaseClient
+    .from('employees')
+    .select('*')
+    .eq('is_active', true)
+    .order('id');
+  if (data && data.length > 0) {
+    const mapped = data.map(e => ({
+      id: e.id, name: e.name, short: e.short,
+      role: e.role, roleLabel: e.role_label,
+      dept: e.dept, color: e.color,
+    }));
+    USERS.splice(0, USERS.length, ...mapped);
+  }
+}
+
+window.APP_STATE   = state;
+window.APP_USERS   = USERS;
+window.refreshUsers = refreshUsers;
 window.getUser    = getUser;
 window.canManage  = canManage;
 window.nextId     = nextId;
