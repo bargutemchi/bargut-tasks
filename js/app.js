@@ -32,7 +32,6 @@ router.beforeEach((to) => {
 const NAV_MAIN = [
   { path:'/dashboard', icon:'🏠', label:'Главная' },
   { path:'/tasks',     icon:'✅', label:'Задачи' },
-  { path:'/schedule',  icon:'📅', label:'Дежурства' },
   { path:'/chat',      icon:'💬', label:'Чат' },
   { path:'/more',      icon:'⋯',  label:'Ещё' },
 ];
