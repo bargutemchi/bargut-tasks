@@ -5,6 +5,9 @@ const { createRouter, createWebHashHistory } = VueRouter;
 
 const state = window.APP_STATE;
 
+// Загружаем сотрудников из Supabase при старте
+window.refreshUsers && window.refreshUsers();
+
 // Регистрируем Service Worker сразу
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -26,6 +29,7 @@ const router = createRouter({
     { path:'/documents',     component: window.DocumentsView },
     { path:'/notifications', component: window.NotificationsView },
     { path:'/departments',   component: window.DepartmentsView },
+    { path:'/employees',     component: window.EmployeesView },
     { path:'/:pathMatch(.*)*', redirect:'/' },
   ],
 });
@@ -49,6 +53,7 @@ const NAV_MORE = [
   { path:'/documents',     icon:'📁', label:'Документы' },
   { path:'/notifications', icon:'🔔', label:'Уведомления' },
   { path:'/departments',   icon:'🏢', label:'Отделы' },
+  { path:'/employees',     icon:'👥', label:'Сотрудники' },
 ];
 
 // ── Root App ─────────────────────────────────────────────────
