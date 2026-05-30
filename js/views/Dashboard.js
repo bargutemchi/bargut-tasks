@@ -106,26 +106,6 @@ window.DashboardView = defineComponent({
         </div>
       </div>
 
-      <!-- Notifications -->
-      <div class="section-title">Уведомления</div>
-      <div class="card" style="padding:8px 16px;">
-        <div v-if="unreadNotifs.length === 0"
-             style="padding:12px 0; text-align:center; color:#8a9aba; font-size:13px;">
-          Новых уведомлений нет
-        </div>
-        <div v-for="n in unreadNotifs" :key="n.id" class="list-item">
-          <span style="font-size:20px;">{{ notifIcon[n.type] || '📌' }}</span>
-          <div class="list-item-body">
-            <div class="list-item-title">{{ n.title }}</div>
-            <div class="list-item-sub">{{ n.body }}</div>
-          </div>
-          <div class="unread-dot"></div>
-        </div>
-        <div @click="router.push('/notifications')"
-             style="text-align:center; padding:10px 0; color:#08205e; font-size:13px; font-weight:600; cursor:pointer;">
-          Все уведомления →
-        </div>
-      </div>
     </div>
   `,
 });
