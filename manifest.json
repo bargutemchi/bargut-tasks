@@ -2,7 +2,7 @@
   "name": "Баргут Эмчи — Персонал",
   "short_name": "Баргут Эмчи",
   "description": "Корпоративное приложение центра восточной медицины",
-  "start_url": "/bargut-tasks/",
+  "start_url": "/bargut-tasks/portal.html",
   "scope": "/bargut-tasks/",
   "display": "standalone",
   "background_color": "#08205e",
