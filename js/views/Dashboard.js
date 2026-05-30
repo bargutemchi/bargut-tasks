@@ -106,28 +106,6 @@ window.DashboardView = defineComponent({
         </div>
       </div>
 
-      <!-- Today shifts -->
-      <div class="section-title">Дежурства сегодня</div>
-      <div class="card" style="padding:8px 16px;">
-        <div v-if="todayShifts.length === 0" class="empty-state" style="padding:24px;">
-          <span class="empty-icon">📅</span>
-          <span class="empty-text">Нет дежурств</span>
-        </div>
-        <div v-for="s in todayShifts" :key="s.id" class="list-item">
-          <div class="avatar avatar-sm" :style="{ background: getUser(s.userId)?.color }">
-            {{ getUser(s.userId)?.short }}
-          </div>
-          <div class="list-item-body">
-            <div class="list-item-title">{{ getUser(s.userId)?.name }}</div>
-            <div class="list-item-sub">{{ s.start }} – {{ s.end }} · {{ s.room }}</div>
-          </div>
-        </div>
-        <div @click="router.push('/schedule')"
-             style="text-align:center; padding:10px 0; color:#08205e; font-size:13px; font-weight:600; cursor:pointer;">
-          Расписание →
-        </div>
-      </div>
-
       <!-- Notifications -->
       <div class="section-title">Уведомления</div>
       <div class="card" style="padding:8px 16px;">
