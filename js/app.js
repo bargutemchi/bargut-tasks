@@ -75,9 +75,6 @@ const App = defineComponent({
     watch(() => state.currentUser, (u) => {
       if (u) {
         window.Presence && window.Presence.startPresence(u.id);
-        setTimeout(() => {
-          window.PushMgr && window.PushMgr.subscribePush(u.id);
-        }, 2000);
       } else {
         window.Presence && window.Presence.stopPresence();
       }
