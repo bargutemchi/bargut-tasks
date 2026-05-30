@@ -1,9 +1,16 @@
 /* global Vue, VueRouter, APP_STATE, APP_USERS, canManage */
 (function () {
-const { createApp, defineComponent, ref, computed } = Vue;
+const { createApp, defineComponent, ref, computed, watch } = Vue;
 const { createRouter, createWebHashHistory } = VueRouter;
 
 const state = window.APP_STATE;
+
+// Регистрируем Service Worker сразу
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    window.PushMgr && window.PushMgr.registerSW();
+  });
+}
 
 // ── Router ──────────────────────────────────────────────────
 const router = createRouter({
@@ -59,7 +66,20 @@ const App = defineComponent({
       router.push(path);
     }
 
+    // Запуск presence и push при входе/выходе
+    watch(() => state.currentUser, (u) => {
+      if (u) {
+        window.Presence && window.Presence.startPresence(u.id);
+        setTimeout(() => {
+          window.PushMgr && window.PushMgr.subscribePush(u.id);
+        }, 2000);
+      } else {
+        window.Presence && window.Presence.stopPresence();
+      }
+    }, { immediate: true });
+
     function logout() {
+      window.Presence && window.Presence.stopPresence();
       state.currentUser = null;
       router.push('/');
     }
