@@ -49,10 +49,8 @@ body {
 
 /* ══ LAYOUT ══ */
 .app-shell {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
+  display: block;
+  min-height: 100vh;
 }
 
 .app-header {
@@ -61,8 +59,8 @@ body {
   display: flex;
   align-items: center;
   padding: 0 16px;
-  flex-shrink: 0;
-  position: relative;
+  position: fixed;
+  top: 0; left: 0; right: 0;
   z-index: 100;
   box-shadow: 0 2px 8px rgba(0,0,0,.2);
 }
@@ -118,17 +116,20 @@ body {
 }
 
 .app-body {
-  flex: 1;
+  position: fixed;
+  top: var(--header-h);
+  bottom: var(--nav-h);
+  left: 0; right: 0;
   overflow: hidden;
   display: flex;
-  position: relative;
 }
 
 .app-content {
   flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 16px;
-  padding-bottom: calc(var(--nav-h) + 16px);
+  padding-bottom: 24px;
 }
 
 /* ══ BOTTOM NAVIGATION ══ */
@@ -138,9 +139,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-around;
-  flex-shrink: 0;
   border-top: 1px solid rgba(247,216,148,.15);
-  position: relative;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
   z-index: 100;
 }
 
