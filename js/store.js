@@ -5,7 +5,7 @@ const { reactive, watch } = Vue;
 // ── Справочник сотрудников ─────────────────────────────────
 const USERS = [
   { id:1, name:'Руслан Цыдыпович',    short:'Р', role:'owner', roleLabel:'Ген. директор',          dept:null,          color:'#08205e' },
-  { id:2, name:'Ирина Борисовна',     short:'И', role:'admin', roleLabel:'Исполнительный директор', dept:null,          color:'#0d2d7a' },
+  { id:2, name:'Ирина Барисовна',     short:'И', role:'admin', roleLabel:'Управляющий',            dept:null,          color:'#0d2d7a' },
   { id:3, name:'Екатерина Насаковна', short:'Е', role:'admin', roleLabel:'Исполнительный директор', dept:null,          color:'#1a3d8a' },
   { id:4, name:'Анна Сергеевна',      short:'А', role:'staff', roleLabel:'Отдел рекламы',           dept:'advertising', color:'#6a3a7a' },
   { id:5, name:'Татьяна Михайловна',  short:'Т', role:'staff', roleLabel:'Отдел продаж',            dept:'sales',       color:'#7a4a3a' },
