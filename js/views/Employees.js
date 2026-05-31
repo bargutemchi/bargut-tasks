@@ -173,7 +173,12 @@ window.EmployeesView = defineComponent({
         <div class="modal-sheet">
           <div class="modal-header">
             <div class="modal-title">Новый сотрудник</div>
-            <button class="modal-close" @click="showForm=false">✕</button>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <button class="btn btn-primary btn-sm" :disabled="saving" @click="saveEmployee">
+                {{ saving ? '⏳' : 'Сохранить' }}
+              </button>
+              <button class="modal-close" @click="showForm=false">✕</button>
+            </div>
           </div>
 
           <div class="form-group">
