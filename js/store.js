@@ -53,7 +53,7 @@ function saveLS(key, data) {
 
 const state = reactive({
   currentUser:   loadLS('be3_user',   null),
-  tasks:         loadLS('be3_tasks',  DEMO_TASKS),
+  tasks:         [],
   shifts:        loadLS('be3_shifts', DEMO_SHIFTS),
   transactions:  loadLS('be3_tx',     DEMO_TRANSACTIONS),
   phyto:         loadLS('be3_phyto',  DEMO_PHYTO),
@@ -64,7 +64,6 @@ const state = reactive({
 });
 
 watch(() => state.currentUser,   v => saveLS('be3_user',   v));
-watch(() => state.tasks,         v => saveLS('be3_tasks',  v), { deep:true });
 watch(() => state.shifts,        v => saveLS('be3_shifts', v), { deep:true });
 watch(() => state.transactions,  v => saveLS('be3_tx',     v), { deep:true });
 watch(() => state.phyto,         v => saveLS('be3_phyto',  v), { deep:true });
