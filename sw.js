@@ -1,6 +1,5 @@
-const CACHE = 'bargut-v4';
+const CACHE = 'bargut-v5';
 const SHELL = [
-  '/bargut-tasks/',
   '/bargut-tasks/manifest.json',
   '/bargut-tasks/icon-192.png',
   '/bargut-tasks/icon-512.png',
@@ -26,11 +25,24 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // GitHub API и Supabase — только сеть, без кеша
-  if (url.hostname === 'api.github.com' || url.hostname.includes('supabase')) {
+  // Supabase и внешние API — только сеть
+  if (url.hostname.includes('supabase') || url.hostname === 'api.github.com') {
     return;
   }
 
+  // HTML-навигация — сначала сеть, затем кэш (чтобы обновления были видны сразу)
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request).then(resp => {
+        const clone = resp.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return resp;
+      }).catch(() => caches.match(e.request).then(c => c || caches.match('/bargut-tasks/')))
+    );
+    return;
+  }
+
+  // Всё остальное — cache-first
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
@@ -40,10 +52,6 @@ self.addEventListener('fetch', e => {
           caches.open(CACHE).then(c => c.put(e.request, clone));
         }
         return resp;
-      }).catch(() => {
-        if (e.request.mode === 'navigate') {
-          return caches.match('/bargut-tasks/');
-        }
       });
     })
   );
