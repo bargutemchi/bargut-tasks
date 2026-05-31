@@ -1,4 +1,4 @@
-const CACHE = 'bargut-v2';
+const CACHE = 'bargut-v3';
 const SHELL = [
   '/bargut-tasks/',
   '/bargut-tasks/manifest.json',
