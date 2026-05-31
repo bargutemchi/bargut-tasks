@@ -34,6 +34,14 @@ function blobToBase64(blob) {
   });
 }
 
+function formatDateLabel(dateStr) {
+  const today = new Date().toISOString().slice(0, 10);
+  const yest  = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (dateStr === today) return 'Сегодня';
+  if (dateStr === yest)  return 'Вчера';
+  return new Date(dateStr).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+}
+
 window.ChatView = defineComponent({
   name: 'Chat',
 
@@ -54,13 +62,15 @@ window.ChatView = defineComponent({
     const loadError    = ref(null);
     const onlineSet    = Vue.reactive(new Set());
 
+    // Непрочитанные: метки времени последнего посещения комнаты
+    const readAt = ref(JSON.parse(localStorage.getItem('be3_read_at') || '{}'));
+
     // Слушаем изменения онлайн-статуса
     if (window.Presence) {
       window.Presence.onChange(updated => {
         onlineSet.clear();
         updated.forEach(id => onlineSet.add(id));
       });
-      // Инициализируем текущим состоянием
       window.Presence.onlineUsers.forEach(id => onlineSet.add(id));
     }
 
@@ -86,6 +96,42 @@ window.ChatView = defineComponent({
     const currentMessages = computed(() =>
       messages.value.filter(m => m.room_id === roomId.value)
     );
+
+    // Сообщения с разделителями дат
+    const messagesWithDates = computed(() => {
+      const result = [];
+      let lastDate = null;
+      for (const msg of currentMessages.value) {
+        const date = (msg.created_at || '').slice(0, 10);
+        if (date && date !== lastDate) {
+          result.push({ type: 'date', date, label: formatDateLabel(date) });
+          lastDate = date;
+        }
+        result.push(msg);
+      }
+      return result;
+    });
+
+    // Последнее сообщение в комнате
+    function lastMessage(rid) {
+      const roomMsgs = messages.value.filter(m => m.room_id === rid);
+      return roomMsgs[roomMsgs.length - 1] || null;
+    }
+
+    // Непрочитанные
+    function markRead(rid) {
+      readAt.value[rid] = new Date().toISOString();
+      localStorage.setItem('be3_read_at', JSON.stringify(readAt.value));
+    }
+
+    function unreadCount(rid) {
+      const since = readAt.value[rid];
+      return messages.value.filter(function(m) {
+        return m.room_id === rid &&
+          m.sender_id !== user.value.id &&
+          (!since || m.created_at > since);
+      }).length;
+    }
 
     let channel = null;
 
@@ -116,11 +162,20 @@ window.ChatView = defineComponent({
             if (payload.new.room_id === roomId.value) nextTick(scrollToBottom);
           }
         )
+        .on('postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'messages' },
+          payload => {
+            if (payload.old && payload.old.id) {
+              messages.value = messages.value.filter(m => m.id !== payload.old.id);
+            }
+          }
+        )
         .subscribe();
     }
 
     onMounted(async () => {
       await loadMessages();
+      markRead(roomId.value);
       subscribeRealtime();
     });
 
@@ -131,11 +186,19 @@ window.ChatView = defineComponent({
     // ── Навигация ────────────────────────────────────────────
     function selectRoom(rid) {
       roomId.value = rid;
+      markRead(rid);
       nextTick(scrollToBottom);
     }
 
     function scrollToBottom() {
       if (msgEnd.value) msgEnd.value.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // ── Удаление сообщения ───────────────────────────────────
+    async function deleteMsg(id) {
+      messages.value = messages.value.filter(m => m.id !== id);
+      const { error } = await db.from('messages').delete().eq('id', id);
+      if (error) { alert('Ошибка удаления: ' + error.message); loadMessages(); }
     }
 
     // ── Фото ─────────────────────────────────────────────────
@@ -185,7 +248,6 @@ window.ChatView = defineComponent({
 
       if (error) alert('Ошибка отправки: ' + error.message);
 
-      // Push через ntfy.sh (работает когда приложение закрыто)
       if (!error) {
         const notifText = text || '📷 Фото';
         fetch('https://ntfy.sh/bargut-emchi-2026', {
@@ -196,7 +258,7 @@ window.ChatView = defineComponent({
             'Tags': 'hospital',
           },
           body: notifText,
-        }).catch(() => {}); // не блокируем если нет сети
+        }).catch(() => {});
       }
 
       newMsg.value  = '';
@@ -211,14 +273,14 @@ window.ChatView = defineComponent({
     function closeLightbox()    { lightbox.value = null; }
 
     return {
-      user, roomId, rooms, currentRoom, currentMessages,
+      user, roomId, rooms, currentRoom, currentMessages, messagesWithDates,
       newMsg, msgEnd, photoInput,
       mediaPreview, uploading, lightbox, loadError,
       selectRoom, send, handleKey,
       triggerPhoto, onPhotoSelected, cancelMedia,
-      openLightbox, closeLightbox,
+      openLightbox, closeLightbox, deleteMsg,
       formatTime: window.formatTime,
-      isOnline,
+      isOnline, unreadCount, lastMessage,
     };
   },
 
@@ -237,7 +299,7 @@ window.ChatView = defineComponent({
         <div style="overflow-x:auto; display:flex; gap:8px; padding:10px 16px; scrollbar-width:none;">
           <div v-for="room in rooms" :key="room.id"
                style="flex-shrink:0; cursor:pointer;" @click="selectRoom(room.id)">
-            <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:56px;">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:2px; min-width:56px;">
               <div style="position:relative; display:inline-block;">
                 <div class="avatar"
                      :style="{
@@ -247,11 +309,21 @@ window.ChatView = defineComponent({
                      }">
                   {{ room.user ? room.user.short : '👥' }}
                 </div>
+                <!-- Онлайн-индикатор -->
                 <span v-if="room.user && isOnline(room.user.id)"
                       style="position:absolute; bottom:0; right:0; width:10px; height:10px; background:#38a169; border-radius:50%; border:2px solid #fff;"></span>
+                <!-- Бейдж непрочитанных -->
+                <span v-if="unreadCount(room.id) > 0"
+                      style="position:absolute; top:-4px; right:-4px; background:#e53e3e; color:#fff; border-radius:10px; min-width:18px; height:18px; font-size:10px; display:flex; align-items:center; justify-content:center; border:2px solid #fff; font-weight:700; padding:0 3px; line-height:1;">
+                  {{ unreadCount(room.id) > 9 ? '9+' : unreadCount(room.id) }}
+                </span>
               </div>
               <span style="font-size:10px; color:#4a5a7a; text-align:center; max-width:56px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                 {{ room.id==='all' ? 'Все' : room.label }}
+              </span>
+              <!-- Превью последнего сообщения -->
+              <span style="font-size:9px; color:#8a9aba; max-width:56px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; display:block; min-height:12px;">
+                {{ lastMessage(room.id) ? (lastMessage(room.id).media_type === 'image' ? '📷 Фото' : (lastMessage(room.id).text ? lastMessage(room.id).text.slice(0, 16) : '')) : '' }}
               </span>
             </div>
           </div>
@@ -276,36 +348,58 @@ window.ChatView = defineComponent({
           Нет сообщений. Напишите первым! 👋
         </div>
 
-        <template v-for="msg in currentMessages" :key="msg.id">
-          <div :style="{
+        <template v-for="item in messagesWithDates" :key="item.type === 'date' ? ('date-' + item.date) : item.id">
+
+          <!-- Разделитель даты -->
+          <div v-if="item.type === 'date'"
+               style="text-align:center; margin:14px 0 10px; display:flex; align-items:center; gap:8px;">
+            <div style="flex:1; height:1px; background:#d8e2f0;"></div>
+            <span style="background:#d8e2f0; color:#4a5a7a; font-size:11px; padding:3px 10px; border-radius:10px; white-space:nowrap;">
+              {{ item.label }}
+            </span>
+            <div style="flex:1; height:1px; background:#d8e2f0;"></div>
+          </div>
+
+          <!-- Сообщение -->
+          <div v-else :style="{
             display:'flex',
-            justifyContent: msg.sender_id===user.id ? 'flex-end' : 'flex-start',
+            justifyContent: item.sender_id===user.id ? 'flex-end' : 'flex-start',
             marginBottom:'10px'
           }">
             <div style="display:flex; flex-direction:column; max-width:78%;">
 
-              <span v-if="msg.sender_id !== user.id"
+              <span v-if="item.sender_id !== user.id"
                     style="font-size:11px; color:#4a5a7a; font-weight:600; margin-bottom:3px; padding-left:4px;">
-                {{ msg.sender_name }}
+                {{ item.sender_name }}
               </span>
 
               <!-- Фото -->
-              <div v-if="msg.media_type==='image' && msg.media_data" style="margin-bottom:4px;">
-                <img :src="msg.media_data"
+              <div v-if="item.media_type==='image' && item.media_data" style="margin-bottom:4px;">
+                <img :src="item.media_data"
                      style="max-width:220px; max-height:220px; border-radius:12px; display:block; object-fit:cover; cursor:zoom-in;"
-                     @click="openLightbox(msg.media_data)">
+                     @click="openLightbox(item.media_data)">
               </div>
 
               <!-- Текст -->
-              <div v-if="msg.text"
+              <div v-if="item.text"
                    class="chat-bubble"
-                   :class="msg.sender_id===user.id ? 'bubble-out' : 'bubble-in'">
-                {{ msg.text }}
+                   :class="item.sender_id===user.id ? 'bubble-out' : 'bubble-in'">
+                {{ item.text }}
               </div>
 
-              <div class="bubble-time">{{ formatTime(msg.created_at) }}</div>
+              <!-- Время + кнопка удаления -->
+              <div :style="{ display:'flex', alignItems:'center', gap:'4px', justifyContent: item.sender_id===user.id ? 'flex-end' : 'flex-start' }">
+                <div class="bubble-time">{{ formatTime(item.created_at) }}</div>
+                <button v-if="item.sender_id === user.id"
+                        @click="deleteMsg(item.id)"
+                        title="Удалить"
+                        style="background:none; border:none; font-size:11px; color:#c53030; cursor:pointer; padding:0 2px; opacity:0.5; line-height:1; flex-shrink:0;">
+                  ✕
+                </button>
+              </div>
             </div>
           </div>
+
         </template>
 
         <div ref="msgEnd"></div>
