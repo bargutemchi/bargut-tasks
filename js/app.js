@@ -42,7 +42,6 @@ router.beforeEach((to) => {
 // ── Nav config ──────────────────────────────────────────────
 const NAV_MAIN = [
   { path:'/dashboard', icon:'🏠', label:'Главная' },
-  { path:'/tasks',     icon:'✅', label:'Задачи' },
   { path:'/chat',      icon:'💬', label:'Чат' },
   { path:'/more',      icon:'⋯',  label:'Ещё' },
 ];
