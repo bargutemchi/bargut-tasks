@@ -79,32 +79,6 @@ window.DashboardView = defineComponent({
         </div>
       </template>
 
-      <!-- My tasks -->
-      <div class="section-title">Мои задачи</div>
-      <div class="card" style="padding:8px 16px;">
-        <div v-if="myTasks.length === 0" class="empty-state" style="padding:24px;">
-          <span class="empty-icon">✅</span>
-          <span class="empty-text">Нет активных задач</span>
-        </div>
-        <div v-for="task in myTasks" :key="task.id"
-             class="list-item" @click="router.push('/tasks')">
-          <div class="priority-dot" :class="priorityClass[task.priority]" style="margin-top:5px;"></div>
-          <div class="list-item-body">
-            <div class="list-item-title">{{ task.title }}</div>
-            <div class="list-item-meta">
-              <span class="badge" :class="task.status==='todo' ? 'badge-todo' : 'badge-progress'">
-                {{ statusLabel[task.status] }}
-              </span>
-              <span style="font-size:11px; color:#8a9aba;">до {{ formatDate(task.deadline) }}</span>
-            </div>
-          </div>
-          <span style="color:#c0c8d8;">›</span>
-        </div>
-        <div @click="router.push('/tasks')"
-             style="text-align:center; padding:10px 0; color:#08205e; font-size:13px; font-weight:600; cursor:pointer;">
-          Все задачи →
-        </div>
-      </div>
 
     </div>
   `,
