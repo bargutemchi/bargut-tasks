@@ -504,8 +504,8 @@ window.ChatView = defineComponent({
 
       <!-- Строка ввода -->
       <div class="chat-input-row" style="flex-shrink:0; gap:6px;">
-        <input ref="photoInput" type="file" accept="image/*,video/*" capture="environment" style="display:none;" @change="onPhotoSelected">
-        <input ref="fileInput"  type="file" accept="*/*"    style="display:none;" @change="onFileSelected">
+        <input ref="photoInput" type="file" accept="*/*" style="display:none;" @change="onFileSelected">
+        <input ref="fileInput"  type="file" accept="image/*,video/*" capture="environment" style="display:none;" @change="onPhotoSelected">
 
         <button @click="triggerFile" title="Камера"
                 style="background:none; border:none; font-size:22px; cursor:pointer; padding:4px 6px; color:#08205e; flex-shrink:0; line-height:1;">
