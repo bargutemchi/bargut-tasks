@@ -202,13 +202,23 @@ window.ChatView = defineComponent({
       if (error) { alert('Ошибка удаления: ' + error.message); loadMessages(); }
     }
 
-    // ── Фото (камера) ────────────────────────────────────────
+    // ── Камера (фото / видео) ────────────────────────────────
     function triggerPhoto() { if (photoInput.value) photoInput.value.click(); }
 
     async function onPhotoSelected(e) {
       const file = e.target.files[0];
       if (!file) return;
       e.target.value = '';
+
+      if (file.type.startsWith('video/')) {
+        const MAX = 25 * 1024 * 1024; // 25 МБ ≈ 10–15 сек
+        if (file.size > MAX) { alert('Видео слишком большое. Максимум 25 МБ (~15 сек).'); return; }
+        const url = URL.createObjectURL(file);
+        if (mediaPreview.value && mediaPreview.value.url) URL.revokeObjectURL(mediaPreview.value.url);
+        mediaPreview.value = { type: 'file', name: file.name, size: file.size, mime: file.type, file, url };
+        return;
+      }
+
       const blob = await compressImage(file);
       const url  = URL.createObjectURL(blob);
       if (mediaPreview.value && mediaPreview.value.url) URL.revokeObjectURL(mediaPreview.value.url);
@@ -407,8 +417,15 @@ window.ChatView = defineComponent({
                      @click="openLightbox(item.media_data)">
               </div>
 
+              <!-- Видео -->
+              <div v-if="item.media_type==='file' && item.media_data && fileInfo(item) && fileInfo(item).mime && fileInfo(item).mime.startsWith('video/')"
+                   style="margin-bottom:4px;">
+                <video :src="fileInfo(item).b64" controls playsinline
+                       style="max-width:260px; max-height:200px; border-radius:12px; display:block; background:#000;"></video>
+              </div>
+
               <!-- Файл -->
-              <div v-if="item.media_type==='file' && item.media_data"
+              <div v-else-if="item.media_type==='file' && item.media_data"
                    style="margin-bottom:4px; cursor:pointer;"
                    @click="downloadFile(item.media_data)">
                 <div :style="{
@@ -465,6 +482,14 @@ window.ChatView = defineComponent({
             <div style="font-size:11px; color:#8a9aba;">Готово к отправке</div>
           </div>
         </template>
+        <!-- Превью видео -->
+        <template v-else-if="mediaPreview.type === 'file' && mediaPreview.mime && mediaPreview.mime.startsWith('video/')">
+          <video :src="mediaPreview.url" style="height:60px; width:90px; border-radius:8px; object-fit:cover; flex-shrink:0;" muted playsinline></video>
+          <div style="flex:1; overflow:hidden;">
+            <div style="font-size:13px; font-weight:600; color:#1a2a4a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ mediaPreview.name }}</div>
+            <div style="font-size:11px; color:#8a9aba;">{{ formatSize(mediaPreview.size) }} · Видео</div>
+          </div>
+        </template>
         <!-- Превью файла -->
         <template v-else-if="mediaPreview.type === 'file'">
           <span style="font-size:32px; flex-shrink:0;">{{ fileIcon(mediaPreview.mime) }}</span>
@@ -479,7 +504,7 @@ window.ChatView = defineComponent({
 
       <!-- Строка ввода -->
       <div class="chat-input-row" style="flex-shrink:0; gap:6px;">
-        <input ref="photoInput" type="file" accept="image/*" style="display:none;" @change="onPhotoSelected">
+        <input ref="photoInput" type="file" accept="image/*,video/*" capture="environment" style="display:none;" @change="onPhotoSelected">
         <input ref="fileInput"  type="file" accept="*/*"    style="display:none;" @change="onFileSelected">
 
         <button @click="triggerPhoto" title="Фото"
