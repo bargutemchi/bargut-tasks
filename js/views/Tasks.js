@@ -1,16 +1,20 @@
-/* global Vue, APP_STATE, APP_USERS, getUser, canManage, nextId, formatDate, todayStr */
+/* global Vue, APP_STATE, APP_USERS, getUser, canManage, formatDate, todayStr */
 (function () {
-const { defineComponent, ref, computed } = Vue;
+const { defineComponent, ref, computed, onMounted, onUnmounted } = Vue;
 
 window.TasksView = defineComponent({
   name: 'Tasks',
   setup() {
-    const state  = window.APP_STATE;
-    const USERS  = window.APP_USERS;
-    const user   = computed(() => state.currentUser);
-    const filter = ref('all');
+    const db    = window.supabaseClient;
+    const state = window.APP_STATE;
+    const USERS = window.APP_USERS;
+    const user  = computed(() => state.currentUser);
+
+    const filter     = ref('all');
     const showCreate = ref(false);
     const showDetail = ref(null);
+    const loadError  = ref(null);
+    const saving     = ref(false);
 
     const newTask = ref({ title:'', desc:'', assigneeId:null, priority:'medium', dept:'general', deadline: window.todayStr() });
 
@@ -21,6 +25,54 @@ window.TasksView = defineComponent({
       { key:'progress', label:'В работе' },
       { key:'done',     label:'Готово' },
     ];
+
+    // Маппинг snake_case (Supabase) → camelCase (UI)
+    function mapTask(t) {
+      return {
+        id:         t.id,
+        title:      t.title,
+        desc:       t.description || '',
+        assigneeId: t.assignee_id,
+        createdBy:  t.created_by,
+        priority:   t.priority   || 'medium',
+        status:     t.status     || 'todo',
+        dept:       t.dept       || 'general',
+        deadline:   t.deadline   || '',
+        createdAt:  t.created_at || '',
+      };
+    }
+
+    let channel = null;
+
+    async function loadTasks() {
+      const { data, error } = await db
+        .from('tasks').select('*')
+        .order('created_at', { ascending: false });
+      if (error) { loadError.value = error.message; return; }
+      state.tasks = (data || []).map(mapTask);
+    }
+
+    function subscribeRealtime() {
+      channel = db.channel('public:tasks')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tasks' }, payload => {
+          const exists = state.tasks.find(t => t.id === payload.new.id);
+          if (!exists) state.tasks.unshift(mapTask(payload.new));
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tasks' }, payload => {
+          const idx = state.tasks.findIndex(t => t.id === payload.new.id);
+          if (idx !== -1) state.tasks.splice(idx, 1, mapTask(payload.new));
+          if (showDetail.value && showDetail.value.id === payload.new.id)
+            showDetail.value = mapTask(payload.new);
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tasks' }, payload => {
+          if (payload.old && payload.old.id)
+            state.tasks = state.tasks.filter(t => t.id !== payload.old.id);
+        })
+        .subscribe();
+    }
+
+    onMounted(async () => { await loadTasks(); subscribeRealtime(); });
+    onUnmounted(() => { if (channel) db.removeChannel(channel); });
 
     const visibleTasks = computed(() => {
       let tasks = state.tasks;
@@ -33,7 +85,7 @@ window.TasksView = defineComponent({
       if (filter.value === 'done')     tasks = tasks.filter(t => t.status === 'done');
       return [...tasks].sort((a, b) => {
         const p = { high:0, medium:1, low:2 };
-        return p[a.priority] - p[b.priority];
+        return (p[a.priority] || 1) - (p[b.priority] || 1);
       });
     });
 
@@ -48,55 +100,60 @@ window.TasksView = defineComponent({
       return 'todo';
     }
 
-    function advance(task) {
-      if (task.assigneeId === user.value.id || window.canManage(user.value)) {
-        task.status = nextStatus(task.status);
-      }
+    async function advance(task) {
+      if (task.assigneeId !== user.value.id && !window.canManage(user.value)) return;
+      const { error } = await db.from('tasks')
+        .update({ status: nextStatus(task.status), updated_at: new Date().toISOString() })
+        .eq('id', task.id);
+      if (error) alert('Ошибка: ' + error.message);
     }
 
-    function createTask() {
+    async function createTask() {
       if (!newTask.value.title.trim()) return;
-      state.tasks.unshift({
-        id:         window.nextId(state.tasks),
-        title:      newTask.value.title.trim(),
-        desc:       newTask.value.desc.trim(),
-        assigneeId: newTask.value.assigneeId || user.value.id,
-        createdBy:  user.value.id,
-        priority:   newTask.value.priority,
-        status:     'todo',
-        dept:       newTask.value.dept,
-        deadline:   newTask.value.deadline,
-        createdAt:  window.todayStr(),
+      saving.value = true;
+      const { error } = await db.from('tasks').insert({
+        title:       newTask.value.title.trim(),
+        description: newTask.value.desc.trim(),
+        assignee_id: newTask.value.assigneeId || user.value.id,
+        created_by:  user.value.id,
+        priority:    newTask.value.priority,
+        status:      'todo',
+        dept:        newTask.value.dept,
+        deadline:    newTask.value.deadline || null,
       });
-      state.notifications.unshift({
-        id: window.nextId(state.notifications),
-        type: 'task', title: 'Вам назначена задача', body: newTask.value.title,
-        time: new Date().toISOString(), isRead: false, authorId: user.value.id,
-      });
+      saving.value = false;
+      if (error) { alert('Ошибка создания: ' + error.message); return; }
       newTask.value = { title:'', desc:'', assigneeId:null, priority:'medium', dept:'general', deadline: window.todayStr() };
       showCreate.value = false;
     }
 
-    function deleteTask(task) {
-      const idx = state.tasks.findIndex(t => t.id === task.id);
-      if (idx !== -1) state.tasks.splice(idx, 1);
+    async function deleteTask(task) {
+      const { error } = await db.from('tasks').delete().eq('id', task.id);
+      if (error) { alert('Ошибка удаления: ' + error.message); return; }
       showDetail.value = null;
     }
 
     function isOverdue(task) {
-      return task.status !== 'done' && task.deadline < window.todayStr();
+      return task.status !== 'done' && task.deadline && task.deadline < window.todayStr();
     }
 
     return {
-      user, filter, filters, visibleTasks, showCreate, showDetail, newTask,
+      user, filter, filters, visibleTasks, showCreate, showDetail, newTask, loadError, saving,
       priorityClass, priorityLabel, statusClass, statusLabel,
       advance, createTask, deleteTask,
-      getUser: window.getUser, canManage: window.canManage, USERS, formatDate: window.formatDate, isOverdue,
+      getUser: window.getUser, canManage: window.canManage, USERS,
+      formatDate: window.formatDate, isOverdue,
     };
   },
 
   template: `
     <div>
+      <div v-if="loadError"
+           style="padding:12px 16px; background:#fff5f5; color:#c53030; font-size:13px; border-radius:8px; margin-bottom:12px;">
+        ⚠️ Ошибка загрузки задач: {{ loadError }}<br>
+        <small>Создайте таблицу tasks в Supabase SQL Editor.</small>
+      </div>
+
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
         <h1 class="page-title" style="margin:0;">Задачи</h1>
         <button v-if="canManage(user)" class="btn btn-primary btn-sm" @click="showCreate=true">
@@ -223,7 +280,9 @@ window.TasksView = defineComponent({
                 <input type="date" class="form-control" v-model="newTask.deadline">
               </div>
             </div>
-            <button class="btn btn-primary btn-block" @click="createTask">Создать задачу</button>
+            <button class="btn btn-primary btn-block" :disabled="saving" @click="createTask">
+              {{ saving ? 'Сохраняем...' : 'Создать задачу' }}
+            </button>
           </div>
         </div>
       </teleport>
