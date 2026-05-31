@@ -100,6 +100,12 @@ window.ChatView = defineComponent({
 
     const readAt = ref(JSON.parse(localStorage.getItem('be3_read_at') || '{}'));
 
+    const contextMenu = ref(null);
+    const replyTo     = ref(null);
+    const textareaRef = ref(null);
+    const REACTIONS   = ['👍', '❤️', '😜', '🔥', '😭', '😍'];
+    let pressTimer = null;
+
     if (window.Presence) {
       window.Presence.onChange(updated => {
         onlineSet.clear();
@@ -202,6 +208,71 @@ window.ChatView = defineComponent({
       if (error) { alert('Ошибка удаления: ' + error.message); loadMessages(); }
     }
 
+    // ── Контекстное меню ────────────────────────────────────
+    function parseReply(text) {
+      if (!text || !text.startsWith('> ')) return { quote: null, body: text };
+      const lines = text.split('\n');
+      const quoteLines = [];
+      let i = 0;
+      while (i < lines.length && lines[i].startsWith('> ')) {
+        quoteLines.push(lines[i].slice(2));
+        i++;
+      }
+      if (i < lines.length && lines[i] === '') i++;
+      return { quote: quoteLines.join('\n'), body: lines.slice(i).join('\n') };
+    }
+
+    function showMenu(msg) {
+      if (navigator.vibrate) navigator.vibrate(30);
+      contextMenu.value = msg;
+    }
+
+    function startPress(msg) {
+      pressTimer = setTimeout(function () { showMenu(msg); pressTimer = null; }, 500);
+    }
+
+    function endPress() {
+      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    }
+
+    function closeMenu() { contextMenu.value = null; }
+
+    function menuCopy() {
+      if (contextMenu.value && contextMenu.value.text) {
+        navigator.clipboard.writeText(parseReply(contextMenu.value.text).body).catch(function () {});
+      }
+      closeMenu();
+    }
+
+    function menuReply() {
+      replyTo.value = contextMenu.value;
+      closeMenu();
+      nextTick(function () { if (textareaRef.value) textareaRef.value.focus(); });
+    }
+
+    function cancelReply() { replyTo.value = null; }
+
+    async function menuDelete() {
+      const id = contextMenu.value.id;
+      closeMenu();
+      await deleteMsg(id);
+    }
+
+    async function menuReact(emoji) {
+      const msg = contextMenu.value;
+      closeMenu();
+      await db.from('messages').insert({
+        room_id:      msg.room_id,
+        sender_id:    user.value.id,
+        sender_name:  user.value.name,
+        sender_short: user.value.short,
+        sender_color: user.value.color,
+        text:         emoji,
+        media_data:   null,
+        media_type:   null,
+      });
+    }
+
     // ── Камера (фото / видео) ────────────────────────────────
     function triggerPhoto() { if (photoInput.value) photoInput.value.click(); }
 
@@ -285,13 +356,20 @@ window.ChatView = defineComponent({
         mediaPreview.value = null;
       }
 
+      let fullText = text || null;
+      if (fullText && replyTo.value) {
+        const preview = parseReply(replyTo.value.text || '').body || '📎';
+        fullText = '> ' + replyTo.value.sender_name + ': ' + preview.slice(0, 60) + '\n\n' + fullText;
+      }
+      replyTo.value = null;
+
       const { error } = await db.from('messages').insert({
         room_id:      roomId.value,
         sender_id:    user.value.id,
         sender_name:  user.value.name,
         sender_short: user.value.short,
         sender_color: user.value.color,
-        text:         text || null,
+        text:         fullText,
         media_data,
         media_type,
       });
@@ -320,13 +398,16 @@ window.ChatView = defineComponent({
 
     return {
       user, roomId, rooms, currentRoom, currentMessages, messagesWithDates,
-      newMsg, msgEnd, photoInput, fileInput,
+      newMsg, msgEnd, photoInput, fileInput, textareaRef,
       mediaPreview, uploading, lightbox, loadError,
+      contextMenu, replyTo, REACTIONS,
       selectRoom, send, handleKey,
       triggerPhoto, onPhotoSelected, triggerFile, onFileSelected, cancelMedia,
       openLightbox, closeLightbox, deleteMsg,
       formatTime: window.formatTime,
       isOnline, unreadCount, lastMessage, fileInfo, fileIcon, formatSize, downloadFile,
+      parseReply, showMenu, startPress, endPress, closeMenu,
+      menuCopy, menuReply, menuDelete, menuReact, cancelReply,
     };
   },
 
@@ -402,7 +483,10 @@ window.ChatView = defineComponent({
           </div>
 
           <!-- Сообщение -->
-          <div v-else :style="{ display:'flex', justifyContent: item.sender_id===user.id ? 'flex-end' : 'flex-start', marginBottom:'10px' }">
+          <div v-else :style="{ display:'flex', justifyContent: item.sender_id===user.id ? 'flex-end' : 'flex-start', marginBottom:'10px' }"
+               @touchstart.passive="startPress(item)" @touchend="endPress()" @touchmove="endPress()"
+               @contextmenu.prevent="showMenu(item)"
+               style="-webkit-touch-callout:none; user-select:none;">
             <div style="display:flex; flex-direction:column; max-width:78%;">
 
               <span v-if="item.sender_id !== user.id"
@@ -451,18 +535,16 @@ window.ChatView = defineComponent({
               <div v-if="item.text"
                    class="chat-bubble"
                    :class="item.sender_id===user.id ? 'bubble-out' : 'bubble-in'">
-                {{ item.text }}
+                <div v-if="parseReply(item.text).quote"
+                     :style="{ borderLeft: '3px solid ' + (item.sender_id===user.id ? 'rgba(255,255,255,.5)' : '#08205e'), paddingLeft:'8px', marginBottom:'6px', fontSize:'12px', opacity:'0.75', borderRadius:'2px', whiteSpace:'pre-wrap' }">
+                  {{ parseReply(item.text).quote }}
+                </div>
+                {{ parseReply(item.text).body }}
               </div>
 
-              <!-- Время + удаление -->
+              <!-- Время -->
               <div :style="{ display:'flex', alignItems:'center', gap:'4px', justifyContent: item.sender_id===user.id ? 'flex-end' : 'flex-start' }">
                 <div class="bubble-time">{{ formatTime(item.created_at) }}</div>
-                <button v-if="item.sender_id === user.id"
-                        @click="deleteMsg(item.id)"
-                        title="Удалить"
-                        style="background:none; border:none; font-size:11px; color:#c53030; cursor:pointer; padding:0 2px; opacity:0.5; line-height:1; flex-shrink:0;">
-                  ✕
-                </button>
               </div>
             </div>
           </div>
@@ -502,6 +584,18 @@ window.ChatView = defineComponent({
                 style="background:none; border:none; font-size:22px; color:#8a9aba; cursor:pointer; padding:4px; flex-shrink:0;">✕</button>
       </div>
 
+      <!-- Ответ на сообщение -->
+      <div v-if="replyTo"
+           style="background:#fff; border-top:1px solid #e0e8f4; padding:8px 14px; display:flex; align-items:center; gap:10px; flex-shrink:0;">
+        <div style="border-left:3px solid #08205e; padding-left:10px; flex:1; overflow:hidden;">
+          <div style="font-size:11px; font-weight:700; color:#08205e;">↩️ {{ replyTo.sender_name }}</div>
+          <div style="font-size:12px; color:#4a5a7a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            {{ (replyTo.text ? parseReply(replyTo.text).body : '') || '📎 Медиа' }}
+          </div>
+        </div>
+        <button @click="cancelReply" style="background:none; border:none; font-size:20px; color:#8a9aba; cursor:pointer; padding:4px; flex-shrink:0;">✕</button>
+      </div>
+
       <!-- Строка ввода -->
       <div class="chat-input-row" style="flex-shrink:0; gap:6px;">
         <input ref="photoInput" type="file" accept="image/*,video/*" capture="environment" style="display:none;" @change="onPhotoSelected">
@@ -516,7 +610,8 @@ window.ChatView = defineComponent({
           📎
         </button>
 
-        <textarea class="form-control"
+        <textarea ref="textareaRef"
+                  class="form-control"
                   v-model="newMsg"
                   placeholder="Сообщение..."
                   rows="1"
@@ -530,6 +625,32 @@ window.ChatView = defineComponent({
                 @click="send">
           {{ uploading ? '⏳' : '➤' }}
         </button>
+      </div>
+
+      <!-- Контекстное меню сообщения -->
+      <div v-if="contextMenu" @click.self="closeMenu"
+           style="position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9000; display:flex; flex-direction:column; justify-content:flex-end; touch-action:none;">
+        <!-- Реакции -->
+        <div style="display:flex; justify-content:center; gap:10px; padding:14px 20px 12px; background:#1c2d50; border-radius:20px 20px 0 0; margin-bottom:2px;">
+          <span v-for="emoji in REACTIONS" :key="emoji"
+                @click="menuReact(emoji)"
+                style="font-size:32px; cursor:pointer; line-height:1; padding:4px;">{{ emoji }}</span>
+        </div>
+        <!-- Пункты меню -->
+        <div style="background:#fff; overflow:hidden; padding-bottom:env(safe-area-inset-bottom, 8px);">
+          <div @click="menuReply"
+               style="display:flex; align-items:center; gap:16px; padding:16px 20px; border-bottom:1px solid #f0f4fb; cursor:pointer; font-size:16px; color:#1a2a4a; -webkit-tap-highlight-color:rgba(0,0,0,.06);">
+            <span style="width:26px; text-align:center; font-size:20px;">↩️</span> Ответить
+          </div>
+          <div v-if="contextMenu.text" @click="menuCopy"
+               style="display:flex; align-items:center; gap:16px; padding:16px 20px; border-bottom:1px solid #f0f4fb; cursor:pointer; font-size:16px; color:#1a2a4a; -webkit-tap-highlight-color:rgba(0,0,0,.06);">
+            <span style="width:26px; text-align:center; font-size:20px;">📋</span> Скопировать текст
+          </div>
+          <div v-if="contextMenu.sender_id === user.id" @click="menuDelete"
+               style="display:flex; align-items:center; gap:16px; padding:16px 20px; cursor:pointer; font-size:16px; color:#e53e3e; -webkit-tap-highlight-color:rgba(229,62,62,.1);">
+            <span style="width:26px; text-align:center; font-size:20px;">🗑️</span> Удалить
+          </div>
+        </div>
       </div>
 
       <!-- Лайтбокс -->
