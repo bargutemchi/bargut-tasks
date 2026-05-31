@@ -42,6 +42,41 @@ function formatDateLabel(dateStr) {
   return new Date(dateStr).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
 }
 
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' Б';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' КБ';
+  return (bytes / 1048576).toFixed(1) + ' МБ';
+}
+
+function fileIcon(mime) {
+  if (!mime) return '📎';
+  if (mime.startsWith('image/'))       return '🖼️';
+  if (mime.startsWith('video/'))       return '🎬';
+  if (mime.startsWith('audio/'))       return '🎵';
+  if (mime === 'application/pdf')      return '📄';
+  if (mime.includes('word') || mime.includes('document')) return '📝';
+  if (mime.includes('excel') || mime.includes('sheet'))   return '📊';
+  if (mime.includes('presentation') || mime.includes('powerpoint')) return '📊';
+  if (mime.includes('zip') || mime.includes('rar') || mime.includes('archive')) return '🗜️';
+  return '📎';
+}
+
+function downloadFile(mediaData) {
+  try {
+    const info = JSON.parse(mediaData);
+    const a = document.createElement('a');
+    a.href = info.b64;
+    a.download = info.name;
+    a.click();
+  } catch (e) {
+    // fallback для старых записей
+    const a = document.createElement('a');
+    a.href = mediaData;
+    a.download = 'file';
+    a.click();
+  }
+}
+
 window.ChatView = defineComponent({
   name: 'Chat',
 
@@ -59,13 +94,12 @@ window.ChatView = defineComponent({
     const uploading    = ref(false);
     const lightbox     = ref(null);
     const photoInput   = ref(null);
+    const fileInput    = ref(null);
     const loadError    = ref(null);
     const onlineSet    = Vue.reactive(new Set());
 
-    // Непрочитанные: метки времени последнего посещения комнаты
     const readAt = ref(JSON.parse(localStorage.getItem('be3_read_at') || '{}'));
 
-    // Слушаем изменения онлайн-статуса
     if (window.Presence) {
       window.Presence.onChange(updated => {
         onlineSet.clear();
@@ -91,13 +125,9 @@ window.ChatView = defineComponent({
       ];
     });
 
-    const currentRoom = computed(() => rooms.value.find(r => r.id === roomId.value));
+    const currentRoom     = computed(() => rooms.value.find(r => r.id === roomId.value));
+    const currentMessages = computed(() => messages.value.filter(m => m.room_id === roomId.value));
 
-    const currentMessages = computed(() =>
-      messages.value.filter(m => m.room_id === roomId.value)
-    );
-
-    // Сообщения с разделителями дат
     const messagesWithDates = computed(() => {
       const result = [];
       let lastDate = null;
@@ -112,13 +142,11 @@ window.ChatView = defineComponent({
       return result;
     });
 
-    // Последнее сообщение в комнате
     function lastMessage(rid) {
       const roomMsgs = messages.value.filter(m => m.room_id === rid);
       return roomMsgs[roomMsgs.length - 1] || null;
     }
 
-    // Непрочитанные
     function markRead(rid) {
       readAt.value[rid] = new Date().toISOString();
       localStorage.setItem('be3_read_at', JSON.stringify(readAt.value));
@@ -127,81 +155,54 @@ window.ChatView = defineComponent({
     function unreadCount(rid) {
       const since = readAt.value[rid];
       return messages.value.filter(function(m) {
-        return m.room_id === rid &&
-          m.sender_id !== user.value.id &&
-          (!since || m.created_at > since);
+        return m.room_id === rid && m.sender_id !== user.value.id && (!since || m.created_at > since);
       }).length;
+    }
+
+    // Получить инфо о файле из media_data
+    function fileInfo(msg) {
+      if (msg.media_type !== 'file') return null;
+      try { return JSON.parse(msg.media_data); }
+      catch (e) { return { name: 'Файл', size: 0, mime: '', b64: msg.media_data }; }
     }
 
     let channel = null;
 
-    // ── Загрузка истории ─────────────────────────────────────
     async function loadMessages() {
       const { data, error } = await db
-        .from('messages')
-        .select('*')
-        .order('created_at', { ascending: true })
-        .limit(300);
-      if (error) {
-        loadError.value = error.message;
-      } else {
-        messages.value = data || [];
-        nextTick(scrollToBottom);
-      }
+        .from('messages').select('*')
+        .order('created_at', { ascending: true }).limit(300);
+      if (error) { loadError.value = error.message; }
+      else { messages.value = data || []; nextTick(scrollToBottom); }
     }
 
-    // ── Realtime-подписка ────────────────────────────────────
     function subscribeRealtime() {
-      channel = db
-        .channel('public:messages')
-        .on('postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'messages' },
-          payload => {
-            const exists = messages.value.find(m => m.id === payload.new.id);
-            if (!exists) messages.value.push(payload.new);
-            if (payload.new.room_id === roomId.value) nextTick(scrollToBottom);
-          }
-        )
-        .on('postgres_changes',
-          { event: 'DELETE', schema: 'public', table: 'messages' },
-          payload => {
-            if (payload.old && payload.old.id) {
-              messages.value = messages.value.filter(m => m.id !== payload.old.id);
-            }
-          }
-        )
+      channel = db.channel('public:messages')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+          const exists = messages.value.find(m => m.id === payload.new.id);
+          if (!exists) messages.value.push(payload.new);
+          if (payload.new.room_id === roomId.value) nextTick(scrollToBottom);
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => {
+          if (payload.old && payload.old.id)
+            messages.value = messages.value.filter(m => m.id !== payload.old.id);
+        })
         .subscribe();
     }
 
-    onMounted(async () => {
-      await loadMessages();
-      markRead(roomId.value);
-      subscribeRealtime();
-    });
+    onMounted(async () => { await loadMessages(); markRead(roomId.value); subscribeRealtime(); });
+    onUnmounted(() => { if (channel) db.removeChannel(channel); });
 
-    onUnmounted(() => {
-      if (channel) db.removeChannel(channel);
-    });
+    function selectRoom(rid) { roomId.value = rid; markRead(rid); nextTick(scrollToBottom); }
+    function scrollToBottom() { if (msgEnd.value) msgEnd.value.scrollIntoView({ behavior: 'smooth' }); }
 
-    // ── Навигация ────────────────────────────────────────────
-    function selectRoom(rid) {
-      roomId.value = rid;
-      markRead(rid);
-      nextTick(scrollToBottom);
-    }
-
-    function scrollToBottom() {
-      if (msgEnd.value) msgEnd.value.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    // ── Удаление сообщения ───────────────────────────────────
     async function deleteMsg(id) {
       messages.value = messages.value.filter(m => m.id !== id);
       const { error } = await db.from('messages').delete().eq('id', id);
       if (error) { alert('Ошибка удаления: ' + error.message); loadMessages(); }
     }
 
-    // ── Фото ─────────────────────────────────────────────────
+    // ── Фото (камера) ────────────────────────────────────────
     function triggerPhoto() { if (photoInput.value) photoInput.value.click(); }
 
     async function onPhotoSelected(e) {
@@ -210,12 +211,40 @@ window.ChatView = defineComponent({
       e.target.value = '';
       const blob = await compressImage(file);
       const url  = URL.createObjectURL(blob);
-      if (mediaPreview.value) URL.revokeObjectURL(mediaPreview.value.url);
-      mediaPreview.value = { url, blob, type: 'image' };
+      if (mediaPreview.value && mediaPreview.value.url) URL.revokeObjectURL(mediaPreview.value.url);
+      mediaPreview.value = { url, blob, type: 'image', name: file.name };
+    }
+
+    // ── Файл (скрепка) ───────────────────────────────────────
+    function triggerFile() { if (fileInput.value) fileInput.value.click(); }
+
+    async function onFileSelected(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      e.target.value = '';
+
+      const MAX = 10 * 1024 * 1024; // 10 МБ
+      if (file.size > MAX) {
+        alert('Файл слишком большой. Максимум 10 МБ.');
+        return;
+      }
+
+      // Если картинка — сжимаем как обычно
+      if (file.type.startsWith('image/')) {
+        const blob = await compressImage(file);
+        const url  = URL.createObjectURL(blob);
+        if (mediaPreview.value && mediaPreview.value.url) URL.revokeObjectURL(mediaPreview.value.url);
+        mediaPreview.value = { url, blob, type: 'image', name: file.name };
+        return;
+      }
+
+      // Иначе — читаем как base64
+      if (mediaPreview.value && mediaPreview.value.url) URL.revokeObjectURL(mediaPreview.value.url);
+      mediaPreview.value = { type: 'file', name: file.name, size: file.size, mime: file.type, file };
     }
 
     function cancelMedia() {
-      if (mediaPreview.value) URL.revokeObjectURL(mediaPreview.value.url);
+      if (mediaPreview.value && mediaPreview.value.url) URL.revokeObjectURL(mediaPreview.value.url);
       mediaPreview.value = null;
     }
 
@@ -229,9 +258,20 @@ window.ChatView = defineComponent({
       let media_type = null;
 
       if (mediaPreview.value) {
-        media_data = await blobToBase64(mediaPreview.value.blob);
-        media_type = 'image';
-        URL.revokeObjectURL(mediaPreview.value.url);
+        if (mediaPreview.value.type === 'image') {
+          media_data = await blobToBase64(mediaPreview.value.blob);
+          media_type = 'image';
+          if (mediaPreview.value.url) URL.revokeObjectURL(mediaPreview.value.url);
+        } else if (mediaPreview.value.type === 'file') {
+          const b64 = await blobToBase64(mediaPreview.value.file);
+          media_data = JSON.stringify({
+            name: mediaPreview.value.name,
+            size: mediaPreview.value.size,
+            mime: mediaPreview.value.mime,
+            b64,
+          });
+          media_type = 'file';
+        }
         mediaPreview.value = null;
       }
 
@@ -249,19 +289,15 @@ window.ChatView = defineComponent({
       if (error) alert('Ошибка отправки: ' + error.message);
 
       if (!error) {
-        const notifText = text || '📷 Фото';
+        const notifText = text || (media_type === 'file' ? '📎 Файл' : '📷 Фото');
         fetch('https://ntfy.sh/bargut-emchi-2026', {
           method: 'POST',
-          headers: {
-            'Title': user.value.name,
-            'Priority': 'default',
-            'Tags': 'hospital',
-          },
+          headers: { 'Title': user.value.name, 'Priority': 'default', 'Tags': 'hospital' },
           body: notifText,
         }).catch(() => {});
       }
 
-      newMsg.value  = '';
+      newMsg.value = '';
       uploading.value = false;
     }
 
@@ -274,13 +310,13 @@ window.ChatView = defineComponent({
 
     return {
       user, roomId, rooms, currentRoom, currentMessages, messagesWithDates,
-      newMsg, msgEnd, photoInput,
+      newMsg, msgEnd, photoInput, fileInput,
       mediaPreview, uploading, lightbox, loadError,
       selectRoom, send, handleKey,
-      triggerPhoto, onPhotoSelected, cancelMedia,
+      triggerPhoto, onPhotoSelected, triggerFile, onFileSelected, cancelMedia,
       openLightbox, closeLightbox, deleteMsg,
       formatTime: window.formatTime,
-      isOnline, unreadCount, lastMessage,
+      isOnline, unreadCount, lastMessage, fileInfo, fileIcon, formatSize, downloadFile,
     };
   },
 
@@ -309,10 +345,8 @@ window.ChatView = defineComponent({
                      }">
                   {{ room.user ? room.user.short : '👥' }}
                 </div>
-                <!-- Онлайн-индикатор -->
                 <span v-if="room.user && isOnline(room.user.id)"
                       style="position:absolute; bottom:0; right:0; width:10px; height:10px; background:#38a169; border-radius:50%; border:2px solid #fff;"></span>
-                <!-- Бейдж непрочитанных -->
                 <span v-if="unreadCount(room.id) > 0"
                       style="position:absolute; top:-4px; right:-4px; background:#e53e3e; color:#fff; border-radius:10px; min-width:18px; height:18px; font-size:10px; display:flex; align-items:center; justify-content:center; border:2px solid #fff; font-weight:700; padding:0 3px; line-height:1;">
                   {{ unreadCount(room.id) > 9 ? '9+' : unreadCount(room.id) }}
@@ -321,9 +355,8 @@ window.ChatView = defineComponent({
               <span style="font-size:10px; color:#4a5a7a; text-align:center; max-width:56px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                 {{ room.id==='all' ? 'Все' : room.label }}
               </span>
-              <!-- Превью последнего сообщения -->
               <span style="font-size:9px; color:#8a9aba; max-width:56px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; display:block; min-height:12px;">
-                {{ lastMessage(room.id) ? (lastMessage(room.id).media_type === 'image' ? '📷 Фото' : (lastMessage(room.id).text ? lastMessage(room.id).text.slice(0, 16) : '')) : '' }}
+                {{ lastMessage(room.id) ? (lastMessage(room.id).media_type === 'image' ? '📷 Фото' : lastMessage(room.id).media_type === 'file' ? '📎 Файл' : (lastMessage(room.id).text ? lastMessage(room.id).text.slice(0, 16) : '')) : '' }}
               </span>
             </div>
           </div>
@@ -354,18 +387,12 @@ window.ChatView = defineComponent({
           <div v-if="item.type === 'date'"
                style="text-align:center; margin:14px 0 10px; display:flex; align-items:center; gap:8px;">
             <div style="flex:1; height:1px; background:#d8e2f0;"></div>
-            <span style="background:#d8e2f0; color:#4a5a7a; font-size:11px; padding:3px 10px; border-radius:10px; white-space:nowrap;">
-              {{ item.label }}
-            </span>
+            <span style="background:#d8e2f0; color:#4a5a7a; font-size:11px; padding:3px 10px; border-radius:10px; white-space:nowrap;">{{ item.label }}</span>
             <div style="flex:1; height:1px; background:#d8e2f0;"></div>
           </div>
 
           <!-- Сообщение -->
-          <div v-else :style="{
-            display:'flex',
-            justifyContent: item.sender_id===user.id ? 'flex-end' : 'flex-start',
-            marginBottom:'10px'
-          }">
+          <div v-else :style="{ display:'flex', justifyContent: item.sender_id===user.id ? 'flex-end' : 'flex-start', marginBottom:'10px' }">
             <div style="display:flex; flex-direction:column; max-width:78%;">
 
               <span v-if="item.sender_id !== user.id"
@@ -380,6 +407,29 @@ window.ChatView = defineComponent({
                      @click="openLightbox(item.media_data)">
               </div>
 
+              <!-- Файл -->
+              <div v-if="item.media_type==='file' && item.media_data"
+                   style="margin-bottom:4px; cursor:pointer;"
+                   @click="downloadFile(item.media_data)">
+                <div :style="{
+                  display:'flex', alignItems:'center', gap:'10px',
+                  padding:'10px 14px', borderRadius:'12px',
+                  background: item.sender_id===user.id ? '#08205e' : '#fff',
+                  border: item.sender_id===user.id ? 'none' : '1px solid #d8e2f0',
+                  maxWidth:'240px'
+                }">
+                  <span style="font-size:26px; flex-shrink:0;">{{ fileIcon(fileInfo(item) && fileInfo(item).mime) }}</span>
+                  <div style="overflow:hidden;">
+                    <div :style="{ fontSize:'13px', fontWeight:'600', color: item.sender_id===user.id ? '#fff' : '#1a2a4a', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }">
+                      {{ fileInfo(item) ? fileInfo(item).name : 'Файл' }}
+                    </div>
+                    <div :style="{ fontSize:'11px', color: item.sender_id===user.id ? 'rgba(255,255,255,.65)' : '#8a9aba' }">
+                      {{ fileInfo(item) ? formatSize(fileInfo(item).size) : '' }} · Нажмите для скачивания
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Текст -->
               <div v-if="item.text"
                    class="chat-bubble"
@@ -387,7 +437,7 @@ window.ChatView = defineComponent({
                 {{ item.text }}
               </div>
 
-              <!-- Время + кнопка удаления -->
+              <!-- Время + удаление -->
               <div :style="{ display:'flex', alignItems:'center', gap:'4px', justifyContent: item.sender_id===user.id ? 'flex-end' : 'flex-start' }">
                 <div class="bubble-time">{{ formatTime(item.created_at) }}</div>
                 <button v-if="item.sender_id === user.id"
@@ -401,32 +451,44 @@ window.ChatView = defineComponent({
           </div>
 
         </template>
-
         <div ref="msgEnd"></div>
       </div>
 
-      <!-- Превью фото -->
+      <!-- Превью перед отправкой -->
       <div v-if="mediaPreview"
            style="background:#fff; border-top:1px solid #e0e8f4; padding:8px 14px; display:flex; align-items:center; gap:10px; flex-shrink:0;">
-        <img :src="mediaPreview.url"
-             style="height:60px; width:60px; border-radius:8px; object-fit:cover; flex-shrink:0;">
-        <div style="flex:1;">
-          <div style="font-size:13px; font-weight:600; color:#1a2a4a;">📷 Фото</div>
-          <div style="font-size:11px; color:#8a9aba;">Готово к отправке</div>
-        </div>
+        <!-- Превью фото -->
+        <template v-if="mediaPreview.type === 'image'">
+          <img :src="mediaPreview.url" style="height:60px; width:60px; border-radius:8px; object-fit:cover; flex-shrink:0;">
+          <div style="flex:1;">
+            <div style="font-size:13px; font-weight:600; color:#1a2a4a;">📷 Фото</div>
+            <div style="font-size:11px; color:#8a9aba;">Готово к отправке</div>
+          </div>
+        </template>
+        <!-- Превью файла -->
+        <template v-else-if="mediaPreview.type === 'file'">
+          <span style="font-size:32px; flex-shrink:0;">{{ fileIcon(mediaPreview.mime) }}</span>
+          <div style="flex:1; overflow:hidden;">
+            <div style="font-size:13px; font-weight:600; color:#1a2a4a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ mediaPreview.name }}</div>
+            <div style="font-size:11px; color:#8a9aba;">{{ formatSize(mediaPreview.size) }} · Готово к отправке</div>
+          </div>
+        </template>
         <button @click="cancelMedia"
                 style="background:none; border:none; font-size:22px; color:#8a9aba; cursor:pointer; padding:4px; flex-shrink:0;">✕</button>
       </div>
 
       <!-- Строка ввода -->
       <div class="chat-input-row" style="flex-shrink:0; gap:6px;">
-        <input ref="photoInput" type="file" accept="image/*"
-               style="display:none;" @change="onPhotoSelected">
+        <input ref="photoInput" type="file" accept="image/*" style="display:none;" @change="onPhotoSelected">
+        <input ref="fileInput"  type="file" accept="*/*"    style="display:none;" @change="onFileSelected">
 
-        <button @click="triggerPhoto"
-                title="Фото"
+        <button @click="triggerPhoto" title="Фото"
                 style="background:none; border:none; font-size:22px; cursor:pointer; padding:4px 6px; color:#08205e; flex-shrink:0; line-height:1;">
           📷
+        </button>
+        <button @click="triggerFile" title="Прикрепить файл"
+                style="background:none; border:none; font-size:22px; cursor:pointer; padding:4px 6px; color:#08205e; flex-shrink:0; line-height:1;">
+          📎
         </button>
 
         <textarea class="form-control"
@@ -446,11 +508,9 @@ window.ChatView = defineComponent({
       </div>
 
       <!-- Лайтбокс -->
-      <div v-if="lightbox"
-           @click="closeLightbox"
+      <div v-if="lightbox" @click="closeLightbox"
            style="position:fixed; inset:0; background:rgba(0,0,0,.93); z-index:9999; display:flex; align-items:center; justify-content:center; cursor:zoom-out;">
-        <img :src="lightbox"
-             style="max-width:95vw; max-height:90vh; object-fit:contain; border-radius:8px; box-shadow:0 8px 40px rgba(0,0,0,.6);">
+        <img :src="lightbox" style="max-width:95vw; max-height:90vh; object-fit:contain; border-radius:8px; box-shadow:0 8px 40px rgba(0,0,0,.6);">
         <button @click.stop="closeLightbox"
                 style="position:absolute; top:16px; right:16px; background:rgba(255,255,255,.12); border:none; color:#fff; font-size:22px; width:44px; height:44px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center;">
           ✕
